@@ -1,20 +1,15 @@
 import z from '@deepseek-ai/schemastery'
+import { CLAUDE_KNOWN_MODELS } from './known-models.ts'
+import type { ClaudeKnownModel } from './known-models.ts'
+
+export { CLAUDE_KNOWN_MODELS }
+export type { ClaudeKnownModel }
 
 export const name = 'claude-provider'
 export const inject = ['llm', 'settings']
 
 export const CLAUDE_PROVIDER_TYPE = 'claude-adaptive'
 export const CLAUDE_PROVIDER_SETTINGS_NS = 'dsh-claude-provider'
-
-/** Reasoning presets a known Claude model id starts with. */
-export type ClaudeThinkingPreset = 'toggle' | 'four' | 'five'
-
-/** Recorded capacities and thinking preset for one known Claude model id. */
-export interface ClaudeKnownModel {
-  readonly contextWindow: number
-  readonly maxTokens: number
-  readonly preset: ClaudeThinkingPreset
-}
 
 /** Plugin configuration written into the profile patch entry. */
 export const Config = z.object({
@@ -29,27 +24,6 @@ export const CLAUDE_DISCOVERY_API = 'mofeng-anthropic-models'
 const PI_AI_SETTINGS_NS = 'llm-pi-ai'
 const MAX_DISCOVERY_RESPONSE_BYTES = 4 * 1024 * 1024
 const MAX_DISCOVERY_PAGES = 100
-
-/** Recorded capacities and thinking presets for known Claude model ids. */
-export const CLAUDE_KNOWN_MODELS: Readonly<Record<string, ClaudeKnownModel>> = Object.freeze({
-  'claude-fable-5-1': Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: 'five' }),
-  'claude-fable-5': Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: 'five' }),
-  'claude-haiku-5-5': Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: 'five' }),
-  'claude-haiku-4-5-20251001': Object.freeze({ contextWindow: 200000, maxTokens: 64000, preset: 'toggle' }),
-  'claude-haiku-4-5': Object.freeze({ contextWindow: 200000, maxTokens: 64000, preset: 'toggle' }),
-  'claude-opus-4-5-20251101': Object.freeze({ contextWindow: 200000, maxTokens: 64000, preset: 'toggle' }),
-  'claude-opus-4-5': Object.freeze({ contextWindow: 200000, maxTokens: 64000, preset: 'toggle' }),
-  'claude-opus-4-6': Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: 'four' }),
-  'claude-opus-4-7': Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: 'five' }),
-  'claude-opus-4-8': Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: 'five' }),
-  'claude-opus-5': Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: 'five' }),
-  'claude-opus-5-5': Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: 'five' }),
-  'claude-sonnet-4-5-20250929': Object.freeze({ contextWindow: 200000, maxTokens: 64000, preset: 'toggle' }),
-  'claude-sonnet-4-5': Object.freeze({ contextWindow: 200000, maxTokens: 64000, preset: 'toggle' }),
-  'claude-sonnet-4-6': Object.freeze({ contextWindow: 1000000, maxTokens: 64000, preset: 'four' }),
-  'claude-sonnet-5-5': Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: 'five' }),
-  'claude-sonnet-5': Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: 'five' }),
-} as const)
 
 /** One model candidate a provider endpoint disclosed. */
 export interface DiscoveredModel {

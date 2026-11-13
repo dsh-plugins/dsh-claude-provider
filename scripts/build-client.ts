@@ -1,230 +1,156 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+/**
+ * Build the browser half of the plugin from the installed
+ * `@deepseek-ai/dsh-client-ui-settings-models` sources.
+ *
+ * The settings page ships no extension point for a dedicated Claude tab or a
+ * per-model adaptive-thinking switch, so this build stages the upstream
+ * TypeScript sources, applies the patches in `client-patches.ts`, and bundles
+ * the result into the `window.__ModuleLoader__.load({ id, factory })` closure
+ * the DSH web shell serves. Patching sources rather than the published bundle
+ * keeps every edit readable, type-checked, and attributable to one anchor.
+ */
+import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { dirname, resolve } from 'node:path'
+import { dirname, join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import ts from 'typescript'
-import { CLAUDE_KNOWN_MODELS } from '../src/index.ts'
+import * as esbuild from 'esbuild'
+import { transform } from 'lightningcss'
+import { applyClientPatches } from './client-patches.ts'
 
 const require = createRequire(import.meta.url)
-const sourcePath = require.resolve('@deepseek-ai/dsh-client-ui-settings-models/client')
 const here = dirname(fileURLToPath(import.meta.url))
-const outputPath = resolve(here, '../lib/client.js')
+const packageDir = dirname(require.resolve('@deepseek-ai/dsh-client-ui-settings-models/package.json'))
+const upstreamSrc = join(packageDir, 'src')
+const stagingDir = join(here, '../.client-build')
+const outputPath = join(here, '../lib/client.js')
+
+/** Plugin id the web shell registers the client bundle under. */
+const PLUGIN_ID = '@dsh-plugin/dsh-claude-provider'
+
+/** Module specifiers the web shell shares into its frozen module table. */
+const PLATFORM_MODULES = [
+  'react',
+  'react/jsx-runtime',
+  'react-dom',
+  'react-dom/client',
+  '@deepseek-ai/cordis',
+  '@deepseek-ai/dsh-client-store',
+  '@deepseek-ai/dsh-client-ui-slots',
+  '@deepseek-ai/dsh-client-ui-primitives',
+  '@deepseek-ai/dsh-client-ui-dockkit',
+] as const
 
 /**
- * Read the Claude-only helper fragment as plain JavaScript, with the recorded
- * model table inlined. The fragment is a TypeScript module spliced into the
- * upstream bundle, so it is transpiled without a module wrapper: the bundle
- * resolves the bindings it declares.
+ * Host-only modules the browser bundle must never pull in. `schemastery` is
+ * deliberately absent: the staged sources import it for the onboarding config,
+ * and the web shell does not expose it, so it is inlined like the upstream
+ * bundle does.
  */
-async function claudeHelpers(): Promise<string> {
-  const path = new URL('./client-claude.ts', import.meta.url)
-  const source = await readFile(path, 'utf8')
-  const table = `const CLAUDE_KNOWN_MODELS = Object.freeze(${JSON.stringify(CLAUDE_KNOWN_MODELS, null, 2)})`
-  const marker = '// CLAUDE_KNOWN_MODELS 由构建脚本从 src/index.ts 的记录表注入到此处。'
-  if (!source.includes(marker)) throw new Error('build-client: Claude model table marker not found')
-  return ts.transpileModule(source.replace(marker, table), {
-    compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.None },
-    reportDiagnostics: true,
-    fileName: 'client-claude.ts',
-  }).outputText
+const HOST_MODULES = ['@deepseek-ai/dsh-host-webserver'] as const
+
+/** Source files this plugin adds to the staged tree. */
+const ADDED_SOURCES = [
+  ['claude-types.ts', 'client/claude-types.ts'],
+  ['claude-models.ts', 'client/claude-models.ts'],
+  ['claude-adaptive-thinking.tsx', 'client/claude-adaptive-thinking.tsx'],
+  ['../src/known-models.ts', 'client/known-models.ts'],
+] as const
+
+/**
+ * Rewrite the staged constant module's host import to the staged copy of the
+ * recorded model table, so the browser bundle carries its own instance instead
+ * of reaching outside the staged tree.
+ * @param stagingDir - staged source root.
+ */
+async function linkKnownModels(stagingDir: string): Promise<void> {
+  const tablePath = join(stagingDir, 'client', 'claude-types.ts')
+  const constants = await readFile(tablePath, 'utf8')
+  const hostImport = "export { CLAUDE_KNOWN_MODELS } from '../src/known-models.ts'"
+  if (!constants.includes(hostImport)) throw new Error('build-client: recorded model import not found')
+  await writeFile(tablePath, constants.replace(
+    hostImport,
+    "export { CLAUDE_KNOWN_MODELS } from './known-models.ts'",
+  ))
 }
 
-function replaceOnce(label: string, before: string, after: string): void {
-  const first = source.indexOf(before)
-  if (first === -1) throw new Error(`build-client: ${label} anchor not found`)
-  if (source.indexOf(before, first + before.length) !== -1) {
-    throw new Error(`build-client: ${label} anchor is not unique`)
+/**
+ * An esbuild plugin compiling `*.module.css` into a hashed class map plus its
+ * injected stylesheet, matching the artifact the DSH client builder emits.
+ */
+function cssModulesPlugin(): esbuild.Plugin {
+  return {
+    name: 'dsh-css-modules',
+    setup(build) {
+      build.onLoad({ filter: /\.module\.css$/ }, async (args) => {
+        const code = await readFile(args.path)
+        const result = transform({ filename: args.path, code, cssModules: { pattern: '[hash]_[local]' }, minify: true })
+        const classes: Record<string, string> = {}
+        for (const [local, exported] of Object.entries(result.exports ?? {})) classes[local] = exported.name
+        const tagId = `${PLUGIN_ID}/${relative(upstreamSrc, args.path).split(sep).join('/')}`
+        return {
+          loader: 'js',
+          contents: `const classes = ${JSON.stringify(classes)}
+const tagId = ${JSON.stringify(tagId)}
+if (typeof document !== 'undefined' && document.querySelector('style[data-plugin-css=' + JSON.stringify(tagId) + ']') === null) {
+  const tag = document.createElement('style')
+  tag.dataset.plugin = ${JSON.stringify(PLUGIN_ID)}
+  tag.dataset.pluginCss = tagId
+  tag.textContent = ${JSON.stringify(result.code.toString())}
+  document.head.appendChild(tag)
+}
+export default classes
+`,
+        }
+      })
+    },
   }
-  source = source.slice(0, first) + after + source.slice(first + before.length)
 }
 
-function replaceExactly(label: string, before: string, after: string, expected: number): void {
-  let count = 0
-  let offset = 0
-  while ((offset = source.indexOf(before, offset)) !== -1) {
-    count += 1
-    offset += before.length
+/**
+ * Stage the upstream sources, add this plugin's modules, apply the patches, and
+ * bundle the client half into `lib/client.js`.
+ */
+async function build(): Promise<void> {
+  await rm(stagingDir, { recursive: true, force: true })
+  await mkdir(stagingDir, { recursive: true })
+  await cp(upstreamSrc, stagingDir, { recursive: true })
+  for (const [source, target] of ADDED_SOURCES) {
+    await cp(new URL(`./${source}`, import.meta.url), join(stagingDir, target))
   }
-  if (count !== expected) {
-    throw new Error(`build-client: ${label} expected ${expected} anchors, found ${count}`)
-  }
-  source = source.replaceAll(before, after)
+  await linkKnownModels(stagingDir)
+
+  const patched = await applyClientPatches(stagingDir)
+  const result = await esbuild.build({
+    entryPoints: [join(stagingDir, 'client', 'index.ts')],
+    bundle: true,
+    write: false,
+    format: 'cjs',
+    platform: 'browser',
+    target: 'es2022',
+    sourcemap: false,
+    legalComments: 'none',
+    external: [...PLATFORM_MODULES, ...HOST_MODULES],
+    plugins: [cssModulesPlugin()],
+    define: {
+      'process.env.NODE_ENV': JSON.stringify('production'),
+      'import.meta.env.MODE': JSON.stringify('production'),
+      'import.meta.env': JSON.stringify({ MODE: 'production' }),
+    },
+  })
+  const code = result.outputFiles[0]?.text
+  if (code === undefined) throw new Error('build-client: esbuild produced no bundle')
+  const bundle = `window.__ModuleLoader__.load({
+\tid: ${JSON.stringify(PLUGIN_ID)},
+\tfactory: (require) => {
+\t\tvar module = { exports: {} };
+\t\tvar exports = module.exports;
+${code}
+\t\treturn module.exports;
+\t} });
+`
+  await mkdir(dirname(outputPath), { recursive: true })
+  await writeFile(outputPath, bundle)
+  process.stderr.write(`build-client: patched ${patched.patches} anchors across ${patched.files} files\n`)
 }
 
-let source: string = await readFile(sourcePath, 'utf8')
-
-source = source.replaceAll('@deepseek-ai/dsh-client-ui-settings-models', '@dsh-plugin/dsh-claude-provider')
-
-replaceOnce(
-  'RC8 credential update compatibility',
-  '\t\t\t\t\tctx.remote.$on("credentials/reference-updated", refreshModels),',
-  '\t\t\t\t\tctx.remote.$on("credentials/reference-updated", refreshModels),\n\t\t\t\t\tctx.remote.$on("credentials/updated", refreshModels),',
-)
-
-replaceOnce(
-  'custom Claude uses native Anthropic discovery',
-  '\t\t\t\t\t\t...probe.api === void 0 ? {} : { api: probe.api },',
-  '\t\t\t\t\t\t...probe.api === void 0 ? {} : { api: props.thinkingPresets ? CLAUDE_DISCOVERY_API : probe.api },',
-)
-
-replaceOnce(
-  'provider type state',
-  '\t\t\tconst [baseURL, setBaseURL] = (0, react.useState)("");\n\t\t\tconst [protocol, setProtocol] = (0, react.useState)(protocols[0] ?? "");',
-  '\t\t\tconst [baseURL, setBaseURL] = (0, react.useState)("");\n\t\t\tconst providerType = props.providerType ?? "generic";\n\t\t\tconst isAdaptiveClaude = providerType === CLAUDE_PROVIDER_TYPE;\n\t\t\tconst [protocol, setProtocol] = (0, react.useState)(isAdaptiveClaude ? "anthropic-messages" : protocols[0] ?? "");',
-)
-
-replaceOnce(
-  'Claude profile serialization',
-  '\t\t\t\t\t\tapi: protocol,\n\t\t\t\t\t\tbaseURL: normalizedBaseURL,\n\t\t\t\t\t\tmodels: models.map((model) => ({ ...model }))',
-  '\t\t\t\t\t\tapi: isAdaptiveClaude ? "anthropic-messages" : protocol,\n\t\t\t\t\t\tbaseURL: normalizedBaseURL,\n\t\t\t\t\t\tmodels: models.map((model) => isAdaptiveClaude ? withNativeClaudeModel(model) : { ...model }),\n\t\t\t\t\t\t...isAdaptiveClaude ? { reasoning: "high" } : {}',
-)
-
-replaceOnce(
-  'existing Claude profile serialization',
-  '\t\t\t\tconst next = layout === "pi-ai" && stringAt(draft, "apiKeyEnv") === void 0 && stringAt(fallback, "apiKeyEnv") === void 0 && keyValue.length > 0 ? schema.setPath(draft, ["apiKeyEnv"], keyRef) : draft;',
-  '\t\t\t\tconst credentialDraft = layout === "pi-ai" && stringAt(draft, "apiKeyEnv") === void 0 && stringAt(fallback, "apiKeyEnv") === void 0 && keyValue.length > 0 ? schema.setPath(draft, ["apiKeyEnv"], keyRef) : draft;\n\t\t\t\tconst next = props.thinkingPresets === true ? withNativeClaudeProfile(credentialDraft) : credentialDraft;',
-)
-
-replaceOnce(
-  'persist Claude provider type after profile creation',
-  '\t\t\t\tif (storesKey) {\n\t\t\t\t\tconst stored = await operations.storeCredential(keyRef, keyValue);',
-  '\t\t\t\tif (isAdaptiveClaude) {\n\t\t\t\t\tconst typed = await operations.writeSettings(CLAUDE_PROVIDER_SETTINGS_NS, [{\n\t\t\t\t\t\top: "set",\n\t\t\t\t\t\tpath: ["providerTypes", route],\n\t\t\t\t\t\tvalue: CLAUDE_PROVIDER_TYPE\n\t\t\t\t\t}], void 0);\n\t\t\t\t\tif (typed.kind !== "written") return typed.kind === "conflict" ? t("conflict") : typed.message;\n\t\t\t\t}\n\t\t\t\tif (storesKey) {\n\t\t\t\t\tconst stored = await operations.storeCredential(keyRef, keyValue);',
-)
-
-replaceOnce(
-  'remove persisted Claude provider type',
-  '\t\t\t}], void 0);\n\t\t\tif (written.kind !== "written") return written.message;\n\t\t\tawait controller.load();',
-  '\t\t\t}], void 0);\n\t\t\tif (written.kind !== "written") return written.message;\n\t\t\tconst typedRemoval = await operations.writeSettings(CLAUDE_PROVIDER_SETTINGS_NS, [{\n\t\t\t\top: "unset",\n\t\t\t\tpath: ["providerTypes", target.provider]\n\t\t\t}], void 0);\n\t\t\tif (typedRemoval.kind !== "written") return typedRemoval.message;\n\t\t\tawait controller.load();',
-)
-
-replaceOnce(
-  'protocol lock',
-  '\t\t\t\t\t\t\tdisabled: profileDisabled,\n\t\t\t\t\t\t\tonChange: (event) => {\n\t\t\t\t\t\t\t\tsetProtocol(event.target.value);',
-  '\t\t\t\t\t\t\tdisabled: profileDisabled || isAdaptiveClaude,\n\t\t\t\t\t\t\tonChange: (event) => {\n\t\t\t\t\t\t\t\tsetProtocol(event.target.value);',
-)
-
-replaceOnce(
-  'existing Claude protocol lock',
-  '\t\t\t\t\t\t\t\t\t"aria-label": t("customApi"),\n\t\t\t\t\t\t\t\t\tdisabled,\n\t\t\t\t\t\t\t\t\tonChange: (event) => {\n\t\t\t\t\t\t\t\t\t\tsetField("api", event.target.value);',
-  '\t\t\t\t\t\t\t\t\t"aria-label": t("customApi"),\n\t\t\t\t\t\t\t\t\tdisabled: disabled || props.thinkingPresets === true,\n\t\t\t\t\t\t\t\t\tonChange: (event) => {\n\t\t\t\t\t\t\t\t\t\tsetField("api", event.target.value);',
-)
-
-replaceOnce(
-  'row Claude fact',
-  '\t\t\t\t\t\t\tconst credentialConfigured = row.credential?.configured === true;',
-  '\t\t\t\t\t\t\tconst adaptiveClaude = isClaudeProvider(row, state);\n\t\t\t\t\t\t\tconst credentialConfigured = row.credential?.configured === true;',
-)
-
-replaceExactly(
-  'Claude type in setup and open provider editors',
-  '\t\t\t\t\t\t\t\t\t\trow,\n\t\t\t\t\t\t\t\t\t\tnamespace,',
-  '\t\t\t\t\t\t\t\t\t\trow,\n\t\t\t\t\t\t\t\t\t\tthinkingPresets: isClaudeProvider(row, state),\n\t\t\t\t\t\t\t\t\t\tnamespace,',
-  2,
-)
-
-replaceOnce(
-  'row Claude badge',
-  '\t\t\t\t\t\t\t\t\t\t\t\trow.entry.provider === "deepseek-account" ?',
-  '\t\t\t\t\t\t\t\t\t\t\t\tadaptiveClaude ? (0, react_jsx_runtime.jsx)("span", {\n\t\t\t\t\t\t\t\t\t\t\t\t\tclassName: ModelsSection_module_css_default["rowTag"],\n\t\t\t\t\t\t\t\t\t\t\t\t\tchildren: t("adaptiveClaudeTag")\n\t\t\t\t\t\t\t\t\t\t\t\t}) : null,\n\t\t\t\t\t\t\t\t\t\t\t\trow.entry.provider === "deepseek-account" ?',
-)
-
-source = source.replaceAll('children: t("adaptiveClaudeTag")', 'children: t("claudeTypeTag")')
-
-replaceOnce(
-  'fetched Claude models use recorded metadata',
-  'const addedRows = activeCandidates.filter((candidate) => isPicked(candidate.id) && !keptIds.has(candidate.id)).map(adopt);',
-  'const addedRows = activeCandidates.filter((candidate) => isPicked(candidate.id) && !keptIds.has(candidate.id)).map((candidate) => props.thinkingPresets ? withFetchedClaudeMetadata(adopt(candidate)) : adopt(candidate));',
-)
-
-// Keep the upstream shared row and append Claude-only controls to its expanded fields.
-
-replaceOnce(
-  'Claude model row defaults and presets',
-  '\t\t\t\t\t\t\tinputField: "input",\n\t\t\t\t\t\t\tinputFallback: inputDefaults.get(textOf(model, "id")) ?? props.defaultInput,',
-  '\t\t\t\t\t\t\tinputField: "input",\n\t\t\t\t\t\t\tthinkingPresets: props.thinkingPresets,\n\t\t\t\t\t\t\tinputFallback: props.thinkingPresets && CLAUDE_KNOWN_MODELS[model.id] ? ["text", "image"] : inputDefaults.get(textOf(model, "id")) ?? props.defaultInput,',
-)
-
-replaceOnce(
-  'custom Claude card enables thinking presets',
-  '\t\t\t\t\t\tprobeBlocked: baseUrlInvalid ? "customBaseUrlInvalid" : keyFailure === "keyBlank" ? "keyBlankNew" : keyFailure,\n\t\t\t\t\t\toperations,\n\t\t\t\t\t\tt,\n\t\t\t\t\t\tdisabled: profileDisabled',
-  '\t\t\t\t\t\tprobeBlocked: baseUrlInvalid ? "customBaseUrlInvalid" : keyFailure === "keyBlank" ? "keyBlankNew" : keyFailure,\n\t\t\t\t\t\tthinkingPresets: isAdaptiveClaude,\n\t\t\t\t\t\toperations,\n\t\t\t\t\t\tt,\n\t\t\t\t\t\tdisabled: profileDisabled',
-)
-
-replaceOnce(
-  'existing Anthropic card enables thinking presets',
-  '\t\t\t\t\t\t\t\t...catalogProps,\n\t\t\t\t\t\t\t\tcatalogProvider: props.declared === true ? void 0 : props.provider,\n\t\t\t\t\t\t\t\treasoningLevels,\n\t\t\t\t\t\t\t\tdefaultInput: Array.isArray(defaultInput) ? defaultInput : void 0,\n\t\t\t\t\t\t\t\tprobe,\n\t\t\t\t\t\t\t\tprobeBlocked: keyFailure,\n\t\t\t\t\t\t\t\toperations',
-  '\t\t\t\t\t\t\t\t...catalogProps,\n\t\t\t\t\t\t\t\tcatalogProvider: props.declared === true ? void 0 : props.provider,\n\t\t\t\t\t\t\t\treasoningLevels,\n\t\t\t\t\t\t\t\tdefaultInput: Array.isArray(defaultInput) ? defaultInput : void 0,\n\t\t\t\t\t\t\t\tprobe,\n\t\t\t\t\t\t\t\tprobeBlocked: keyFailure,\n\t\t\t\t\t\t\t\tthinkingPresets: props.thinkingPresets === true,\n\t\t\t\t\t\t\t\toperations',
-)
-
-replaceOnce('native reasoning editor Claude props',
-  'function ModelReasoningEfforts({ model, levels, position, disabled, t, onChange }) {',
-  'function ModelReasoningEfforts({ model, levels, position, disabled, t, onChange, claude, adaptiveFallback }) {')
-replaceOnce('native reasoning editor model defaults',
-  'const initialEntries = INITIAL_LEVELS.filter((level) => levels.includes(level)).map((level) => [level, defaultValue(level)]);',
-  'const initialEntries = claude ? Object.entries(reasoningEffortsForPreset(CLAUDE_KNOWN_MODELS[model.id]?.preset ?? "five")) : INITIAL_LEVELS.filter((level) => levels.includes(level)).map((level) => [level, defaultValue(level)]);')
-replaceOnce('independent adaptive thinking switch',
-  '\t\t\t\t}), entries === void 0 ? null : (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [',
-  '\t\t\t\t}), claude ? (0, react_jsx_runtime.jsx)(ClaudeAdaptiveThinking, { model, inherited: adaptiveFallback, position, disabled, t, onChange }) : null, entries === void 0 ? null : (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [')
-replaceOnce('Claude reasoning editor wiring',
-  '\t\t\t\t\t\t\tlevels: props.reasoningLevels,',
-  '\t\t\t\t\t\t\tlevels: props.reasoningLevels,\n\t\t\t\t\t\t\tclaude: props.thinkingPresets === true,\n\t\t\t\t\t\t\tadaptiveFallback: props.adaptiveFallback,')
-replaceOnce('Claude row inherited adaptive setting',
-  '\t\t\t\t\t\t\treasoningLevels: props.reasoningLevels,',
-  '\t\t\t\t\t\t\treasoningLevels: props.reasoningLevels,\n\t\t\t\t\t\t\tadaptiveFallback: props.adaptiveFallback,')
-replaceOnce('Claude profile inherited adaptive setting',
-  '\t\t\t\t\t\t\t\tthinkingPresets: props.thinkingPresets === true,',
-  '\t\t\t\t\t\t\t\tthinkingPresets: props.thinkingPresets === true,\n\t\t\t\t\t\t\t\tadaptiveFallback: schema.getPath(draft, ["compat", "forceAdaptiveThinking"]),')
-replaceOnce('new Claude row draft',
-  '\t\t\t\t\t\tonChange([...models, { id: "" }]);',
-  '\t\t\t\t\t\tonChange([...models, props.thinkingPresets ? newClaudeModel() : { id: "" }]);')
-replaceOnce('preserve new model draft while editing identity',
-  '\t\t\t\t\treturn Object.fromEntries(Object.entries({\n\t\t\t\t\t\t...model,\n\t\t\t\t\t\t...next\n\t\t\t\t\t}).filter(([key]) => !cleared.has(key)));',
-  '\t\t\t\t\treturn carryClaudeDraft(model, Object.fromEntries(Object.entries({\n\t\t\t\t\t\t...model,\n\t\t\t\t\t\t...next\n\t\t\t\t\t}).filter(([key]) => !cleared.has(key))));')
-replaceOnce('new Claude defaults after model identity is entered',
-  '\t\t\t\t\t\t\tonFieldChange: (field, value) => {\n\t\t\t\t\t\t\t\tpatch(index, { [field]: value });',
-  '\t\t\t\t\t\t\tonIdBlur: () => {\n\t\t\t\t\t\t\t\tif (!props.thinkingPresets) return;\n\t\t\t\t\t\t\t\tconst next = finishClaudeDraft(model);\n\t\t\t\t\t\t\t\tif (next !== model) onChange(models.map((row, at) => at === index ? next : row));\n\t\t\t\t\t\t\t},\n\t\t\t\t\t\t\tonFieldChange: (field, value) => {\n\t\t\t\t\t\t\t\tpatch(index, { [field]: value });')
-replaceOnce('new Claude profile compatible default effort',
-  '\t\t\t\t\t\tvalue: profile\n\t\t\t\t\t}], openedAt);',
-  '\t\t\t\t\t\tvalue: isAdaptiveClaude ? withNativeClaudeProfile(profile) : profile\n\t\t\t\t\t}], openedAt);')
-replaceOnce('English Claude copy', '\t\t\tcustomTag: "Custom",',
-  '\t\t\tcustomTag: "Custom",\n\t\t\tclaudeCustomAdd: "Add Claude provider",\n\t\t\tclaudeCustomTitle: "Claude provider",\n\t\t\tclaudeTypeTag: "Claude provider",\n\t\t\tclaudeAdaptiveThinking: "Adaptive thinking",\n\t\t\tclaudeAdaptiveHelpLabel: "Adaptive thinking help",\n\t\t\tclaudeAdaptiveHelp: "For Anthropic-compatible models that support adaptive thinking. When enabled, the model adjusts its thinking based on task complexity and your selected reasoning level. When disabled, it uses the thinking token limit associated with that level.",')
-replaceOnce('Chinese Claude copy', '\t\t\tcustomTag: "自定义",',
-  '\t\t\tcustomTag: "自定义",\n\t\t\tclaudeCustomAdd: "添加 Claude 提供方",\n\t\t\tclaudeCustomTitle: "Claude 提供方",\n\t\t\tclaudeTypeTag: "Claude 提供方",\n\t\t\tclaudeAdaptiveThinking: "自适应思考",\n\t\t\tclaudeAdaptiveHelpLabel: "自适应思考说明",\n\t\t\tclaudeAdaptiveHelp: "适用于支持自适应思考的 Anthropic 兼容模型。开启后，模型根据任务难度和你选择的推理等级自动调整思考量；关闭后，改用该等级对应的思考 token 数量上限。",')
-
-replaceOnce('Claude tab busy state',
-  'const [customBusy, setCustomBusy] = (0, react.useState)(false);',
-  'const [customBusy, setCustomBusy] = (0, react.useState)(false);\n\t\t\tconst [claudeBusy, setClaudeBusy] = (0, react.useState)(false);')
-replaceOnce('reset Claude busy state', 'setCustomBusy(false);', 'setCustomBusy(false);\n\t\t\t\tsetClaudeBusy(false);')
-replaceOnce('lock all provider tabs during requests', 'const switchLocked = catalogBusy || customBusy;', 'const switchLocked = catalogBusy || customBusy || claudeBusy;')
-replaceOnce('allow Claude tab without catalog', 'const bothOffered = catalogOffered && customOffered;', 'const claudeEnabled = customEnabled && state.namespaces.has(CLAUDE_PROVIDER_SETTINGS_NS);\n\t\t\tconst bothOffered = customOffered;')
-replaceOnce('Claude provider option',
-  '...customEnabled ? {} : { title: t("addCustomUnavailable") }\n\t\t\t\t\t\t\t\t\t\t}],',
-  '...customEnabled ? {} : { title: t("addCustomUnavailable") }\n\t\t\t\t\t\t\t\t\t\t}, { value: "claude", label: t("claudeCustomTitle"), disabled: !claudeEnabled }],')
-// Keep independent mounted cards so switching modes preserves both drafts.
-const panelStart = source.indexOf('\t\t\t\t\t\t\t\tmounted("custom") && piAi !== void 0')
-const panelEnd = source.indexOf('}) : null', panelStart) + '}) : null'.length
-if (panelStart < 0 || panelEnd < panelStart) throw new Error('custom panel not found')
-const customPanel = source.slice(panelStart, panelEnd)
-const claudePanel = customPanel.replaceAll('"custom"', '"claude"')
-  .replaceAll('-custom', '-claude')
-  .replace('taken: state.rows', 'providerType: CLAUDE_PROVIDER_TYPE,\n\t\t\t\t\t\t\t\t\t\ttaken: state.rows')
-  .replace('onBusyChange: setCustomBusy', 'onBusyChange: setClaudeBusy')
-source = source.slice(0, panelEnd) + ',\n' + claudePanel + source.slice(panelEnd)
-
-replaceOnce('hide generic hint on Claude tab', "className: ModelsSection_module_css_default[\"advancedHint\"],\n\t\t\t\t\t\t\t\t\t\tchildren: t(mode === \"catalog\" ? \"addCatalogHint\" : \"addCustomHint\")", "hidden: mode === \"claude\",\n\t\t\t\t\t\t\t\t\t\tclassName: ModelsSection_module_css_default[\"advancedHint\"],\n\t\t\t\t\t\t\t\t\t\tchildren: t(mode === \"catalog\" ? \"addCatalogHint\" : \"addCustomHint\")")
-
-replaceOnce('compact English provider tabs', 'addCatalog: "Third-party model provider",', 'addCatalog: "Third-party providers",')
-replaceOnce('compact English custom API tab', 'addCustom: "Custom model API",', 'addCustom: "Custom API",')
-
-// The helper fragment goes in last: its own text never becomes an anchor.
-const helpers = await claudeHelpers()
-replaceOnce(
-  'Claude model helpers',
-  '\t\t/** Stable visible and accessible identity for one provider target. */',
-  '\t\t// BEGIN CLAUDE HELPERS\n'
-  + helpers.split('\n').map(line => line.length ? '\t\t' + line : '').join('\n')
-  + '\n\t\t// END CLAUDE HELPERS\n\t\t/** Stable visible and accessible identity for one provider target. */',
-)
-
-await mkdir(dirname(outputPath), { recursive: true })
-await writeFile(outputPath, source)
+await build()

@@ -6,6 +6,8 @@ DSH Claude Provider 为 DeepSeek Harness 提供专用的 Claude 配置界面。�
 
 相比官方的通用自定义提供方配置，插件增加了独立的 Claude 入口、按模型设置的自适应思考开关，以及按已知 Claude 模型自动填写参数的功能。保存后的推理配置由 DeepSeek Harness 原生处理。
 
+本版本适配 DeepSeek Harness 0.2.2-rc.2 与 0.2.2-rc.3。这两个版本重写了模型设置页（新增重试策略、Gemini 协议，以及 `settings.models.provider-card` 与 `settings.models.footer` 扩展槽），因此插件改为基于上游设置页源码构建浏览器半区：`npm run build` 会暂存已安装的 `@deepseek-ai/dsh-client-ui-settings-models` 源码，套用 `scripts/client-patches.ts` 中的锚点补丁，再打包成客户端 bundle。上游挪动锚点时构建直接失败，而不是静默丢失 Claude 控件。
+
 ## 插件功能
 
 1. **增加独立的 Claude 提供方类型**
@@ -59,11 +61,13 @@ npx @deepseek-ai/dsh plugin --profile web add @dsh-plugin/dsh-claude-provider
 ```sh
 git clone https://github.com/MoFeng2223/dsh-claude-provider.git
 cd dsh-claude-provider
-npm install
+npm ci
 npm run build
 mkdir -p dist
 npm pack --pack-destination dist
 ```
+
+构建会用 `tsc` 编译宿主半区，并从已安装的 `@deepseek-ai/dsh-client-ui-settings-models` 源码生成浏览器半区，因此 `devDependencies` 中的 DSH 版本决定客户端半区适配的设置页。`npm run typecheck` 与 `npm test` 会分别校验两个半区。
 
 将生成的包安装到 Web Profile：
 
@@ -79,9 +83,9 @@ npx @deepseek-ai/dsh plugin --profile web remove @dsh-plugin/dsh-claude-provider
 
 卸载插件不会删除官方模型配置或已经保存的凭据。已有的 Claude 提供方会继续作为普通的 `anthropic-messages` 自定义提供方保留，已保存的推理档位和自适应思考配置仍然有效。卸载后将不再提供 Claude 专用的添加／编辑界面、分页模型探测和参数预填；官方的模型探测功能仍然可用。
 
-## DSH 0.1.7 升级与配置迁移
+## 配置迁移
 
-本版本适配 DSH 0.1.7-alpha.2。
+插件把 Claude 提供方类型标记保存在自己的 Profile 补丁条目里，因此 DSH 迁移 `settings.yaml` 时可能不会带上这些标记。`src/migrate-legacy-types.ts` 只恢复这些标记，并且仅针对配置中仍声明 `anthropic-messages` 的提供方。
 
 ### 1. 尚未安装新版 DSH
 
@@ -94,6 +98,12 @@ npx @deepseek-ai/dsh plugin --profile web remove @dsh-plugin/dsh-claude-provider
 ### 3. 已安装并运行过新版 DSH
 
 此时 Settings 已经由 DSH 执行过自动迁移，部分配置可能存在迁移问题。
+
+对受影响的 Profile 执行一次补救，缺失的标记会写回，并在补丁文件旁留下带时间戳的备份：
+
+```sh
+npx @dsh-plugin/dsh-claude-provider/migrate-legacy-types
+```
 
 对本插件而言，可能的影响只有 Claude 提供方类型标记丢失，**模型配置和运行不受影响**。
 

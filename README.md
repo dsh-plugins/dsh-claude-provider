@@ -6,6 +6,8 @@ DSH Claude Provider adds a dedicated Claude configuration interface to DeepSeek 
 
 Compared with the official generic custom provider form, the plugin adds a dedicated Claude entry, a per-model adaptive thinking toggle, and automatic defaults for known Claude models. DeepSeek Harness handles the saved reasoning configuration natively.
 
+This release targets DeepSeek Harness 0.2.2-rc.2 and 0.2.2-rc.3. Those versions rewrote the Models settings page — retry policies, the Gemini protocol, and the `settings.models.provider-card` / `settings.models.footer` extension slots — so the plugin now builds its browser half from the upstream page sources: `npm run build` stages the installed `@deepseek-ai/dsh-client-ui-settings-models` sources, applies the anchored patches in `scripts/client-patches.ts`, and bundles the result. A DSH release that moves an anchor fails the build instead of silently dropping the Claude controls.
+
 ## What this plugin does
 
 1. **Adds a dedicated Claude provider type**
@@ -59,11 +61,13 @@ Clone, build, and package the repository first:
 ```sh
 git clone https://github.com/MoFeng2223/dsh-claude-provider.git
 cd dsh-claude-provider
-npm install
+npm ci
 npm run build
 mkdir -p dist
 npm pack --pack-destination dist
 ```
+
+The build compiles the host half with `tsc` and patches the browser half from the installed `@deepseek-ai/dsh-client-ui-settings-models` sources, so the DSH version in `devDependencies` decides which page the client half targets. `npm run typecheck` and `npm test` verify both halves.
 
 Install the generated package into the Web profile:
 
@@ -79,9 +83,9 @@ npx @deepseek-ai/dsh plugin --profile web remove @dsh-plugin/dsh-claude-provider
 
 Uninstalling the plugin does not delete official model settings or stored credentials. Existing Claude providers remain ordinary custom `anthropic-messages` providers, and their saved reasoning levels and adaptive thinking settings remain effective. The dedicated Claude add/edit interface, paginated model discovery, and automatic defaults are no longer available; the official model discovery feature remains available.
 
-## DSH 0.1.7 upgrade and configuration migration
+## Settings migration
 
-This version targets DSH 0.1.7-alpha.2.
+This plugin stores its Claude provider type markers in its own profile patch entry, so a DSH upgrade that migrates `settings.yaml` can leave them behind. `src/migrate-legacy-types.ts` recovers only those markers, and only for providers whose profile still declares `anthropic-messages`.
 
 ### 1. The new DSH version is not installed yet
 
@@ -94,6 +98,12 @@ Migration has not started yet. Update the Claude plugin and any other plugins re
 ### 3. The new DSH version has already been run
 
 DSH has already attempted automatic Settings migration, and some settings may have migration issues.
+
+Run the recovery once against the affected profile, which writes the missing markers back and leaves a timestamped backup beside the patch file:
+
+```sh
+npx @deepseek-ai/dsh-plugin/dsh-claude-provider/migrate-legacy-types
+```
 
 For this plugin, the possible impact is limited to missing Claude provider type markers. **Model configuration and operation are unaffected by the missing markers.**
 
