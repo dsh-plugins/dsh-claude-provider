@@ -4,6 +4,7 @@
   "description": "Custom Claude provider support for DeepSeek Harness 0.2.2-rc.2 and 0.2.2-rc.3",
   "author": "mofeng2223",
   "license": "MIT",
+  "icon": "./icon.svg",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/MoFeng2223/dsh-claude-provider.git"
@@ -39,6 +40,7 @@
       "types": "./lib/migrate-legacy-types.d.ts",
       "default": "./lib/migrate-legacy-types.js"
     },
+    "./locale/*.json": "./locale/*.json",
     "./package.json": "./package.json"
   },
   "files": [
@@ -46,6 +48,8 @@
     "lib/**/*.d.ts",
     "src/**/*.ts",
     "scripts/**/*.ts",
+    "locale/*.json",
+    "icon.svg",
     "cordis.patch.yml",
     "README.md",
     "README.zh-CN.md",

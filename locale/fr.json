@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Fournisseur Claude",
+    "description": "Ajoutez des fournisseurs Claude avec un formulaire Anthropic Messages dédié, un interrupteur de réflexion adaptative par modèle et des capacités préremplies pour les modèles Claude connus ; la liste des modèles est récupérée depuis le catalogue Anthropic du point de terminaison."
+  }
+}

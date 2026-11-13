@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Proveedor Claude",
+    "description": "Agrega proveedores Claude con un formulario dedicado de Anthropic Messages, un interruptor de pensamiento adaptativo por modelo y capacidades ya rellenadas para los modelos Claude conocidos; la lista de modelos se obtiene del catálogo de Anthropic del endpoint."
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Claude provider",
+    "description": "Add Claude providers with a dedicated Anthropic Messages form, a per-model adaptive thinking switch, and pre-filled capacities for known Claude models; the model list is fetched from the endpoint's Anthropic catalogue."
+  }
+}

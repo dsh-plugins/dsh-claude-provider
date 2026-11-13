@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Claudeプロバイダー",
+    "description": "Anthropic Messages専用フォームでClaudeプロバイダーを追加し、モデルごとの適応型思考スイッチと既知のClaudeモデルの容量を自動入力します。モデル一覧はエンドポイントのAnthropicカタログから取得します。"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Claude-Anbieter",
+    "description": "Fügt Claude-Anbieter über ein eigenes Anthropic-Messages-Formular hinzu, mit einem Schalter für adaptives Denken pro Modell und vorausgefüllten Kapazitäten für bekannte Claude-Modelle; die Modellliste stammt aus dem Anthropic-Katalog des Endpunkts."
+  }
+}

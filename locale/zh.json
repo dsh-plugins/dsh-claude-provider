@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Claude 提供商",
+    "description": "以专用的 Anthropic Messages 表单添加 Claude 提供商，支持逐模型的自适应思考开关，并为已知 Claude 模型预填容量；模型列表从端点提供的 Anthropic 目录获取。"
+  }
+}
