@@ -6,9 +6,23 @@ export const inject = ['llm', 'settings']
 export const CLAUDE_PROVIDER_TYPE = 'claude-adaptive'
 export const CLAUDE_PROVIDER_SETTINGS_NS = 'dsh-claude-provider'
 
+/** Reasoning presets a known Claude model id starts with. */
+export type ClaudeThinkingPreset = 'toggle' | 'four' | 'five'
+
+/** Recorded capacities and thinking preset for one known Claude model id. */
+export interface ClaudeKnownModel {
+  readonly contextWindow: number
+  readonly maxTokens: number
+  readonly preset: ClaudeThinkingPreset
+}
+
+/** Plugin configuration written into the profile patch entry. */
 export const Config = z.object({
+  /** Provider ids the settings page marked as this plugin's Claude type. */
   providerTypes: z.dict(z.const(CLAUDE_PROVIDER_TYPE)).default({}).volatile(),
 })
+
+export type Config = ReturnType<typeof Config>
 
 export const CLAUDE_DISCOVERY_API = 'mofeng-anthropic-models'
 
@@ -17,7 +31,7 @@ const MAX_DISCOVERY_RESPONSE_BYTES = 4 * 1024 * 1024
 const MAX_DISCOVERY_PAGES = 100
 
 /** Recorded capacities and thinking presets for known Claude model ids. */
-export const CLAUDE_KNOWN_MODELS = Object.freeze({
+export const CLAUDE_KNOWN_MODELS: Readonly<Record<string, ClaudeKnownModel>> = Object.freeze({
   'claude-fable-5-1': Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: 'five' }),
   'claude-fable-5': Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: 'five' }),
   'claude-haiku-5-5': Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: 'five' }),
@@ -35,23 +49,83 @@ export const CLAUDE_KNOWN_MODELS = Object.freeze({
   'claude-sonnet-4-6': Object.freeze({ contextWindow: 1000000, maxTokens: 64000, preset: 'four' }),
   'claude-sonnet-5-5': Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: 'five' }),
   'claude-sonnet-5': Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: 'five' }),
-})
+} as const)
 
-function requireNonEmptyString(value, field) {
+/** One model candidate a provider endpoint disclosed. */
+export interface DiscoveredModel {
+  id: string
+  name?: string
+  contextWindow?: number
+  maxTokens?: number
+}
+
+/** One endpoint interrogation the settings page asks for. */
+export interface DiscoveryRequest {
+  /** Route the draft would occupy, when the page edits one. */
+  provider?: string
+  /** Wire protocol the draft names. */
+  api?: string
+  /** Endpoint the draft names. */
+  baseURL?: string
+  /** Key typed into the form and not yet stored. */
+  apiKey?: string
+}
+
+/** The interrogation one page performs, including caller cancellation. */
+export type DiscoverModels = (
+  settingsNs: string,
+  request: DiscoveryRequest,
+  signal?: AbortSignal,
+) => Promise<readonly DiscoveredModel[]>
+
+/** Resolved value of one settings namespace, as the settings service reports it. */
+interface SettingsDescriptor {
+  readonly ns: string
+  readonly value?: unknown
+}
+
+/** Settings service face this plugin reads provider types from. */
+interface SettingsFace {
+  describe(): readonly SettingsDescriptor[]
+}
+
+/** Credential service face this plugin resolves stored keys through. */
+interface CredentialsFace {
+  resolve(ref: string): Promise<{ readonly value?: string } | undefined>
+}
+
+/** The LLM service face this plugin wraps. */
+export interface LlmFace {
+  discoverModels: DiscoverModels
+}
+
+/**
+ * Context surface `apply` touches. DSH services are declared here rather than
+ * imported so the plugin keeps a single runtime dependency and absorbs host
+ * service-shape changes at one boundary.
+ */
+export interface PluginContext {
+  readonly llm: LlmFace
+  get(name: 'settings'): SettingsFace | undefined
+  get(name: 'credentials'): CredentialsFace | undefined
+  effect(factory: () => () => void): unknown
+}
+
+function requireNonEmptyString(value: unknown, field: string): string {
   if (typeof value !== 'string' || value.length === 0) {
     throw new Error(`claude-provider: ${field} must be a non-empty string`)
   }
   return value
 }
 
-function positiveInteger(...values) {
+function positiveInteger(...values: readonly unknown[]): number | undefined {
   for (const value of values) {
     if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) return value
   }
   return undefined
 }
 
-function nonEmptyString(...values) {
+function nonEmptyString(...values: readonly unknown[]): string | undefined {
   for (const value of values) {
     if (typeof value === 'string' && value.length > 0) return value
   }
@@ -59,9 +133,9 @@ function nonEmptyString(...values) {
 }
 
 /** Build the Anthropic Models API endpoint from the same base used by Messages. */
-export function anthropicModelsUrl(baseURL) {
+export function anthropicModelsUrl(baseURL: string): URL {
   const raw = requireNonEmptyString(baseURL, 'baseURL').trim()
-  let url
+  let url: URL
   try {
     url = new URL(raw)
   } catch (error) {
@@ -77,7 +151,7 @@ export function anthropicModelsUrl(baseURL) {
   return url
 }
 
-async function readBoundedResponse(response, url) {
+async function readBoundedResponse(response: Response, url: string): Promise<string> {
   const declared = Number(response.headers.get('content-length') ?? Number.NaN)
   if (Number.isFinite(declared) && declared > MAX_DISCOVERY_RESPONSE_BYTES) {
     await response.body?.cancel()
@@ -85,7 +159,7 @@ async function readBoundedResponse(response, url) {
   }
   if (response.body === null) return ''
   const reader = response.body.getReader()
-  const chunks = []
+  const chunks: Uint8Array[] = []
   let total = 0
   try {
     for (;;) {
@@ -109,20 +183,29 @@ async function readBoundedResponse(response, url) {
   return new TextDecoder().decode(body)
 }
 
+/** One parsed Anthropic `/v1/models` page. */
+export interface AnthropicModelPage {
+  models: DiscoveredModel[]
+  hasMore: boolean
+  lastId: string | undefined
+}
+
 /** Parse one Anthropic `/v1/models` page into DSH discovery rows. */
-export function readAnthropicModelPage(body) {
-  const data = body?.data
+export function readAnthropicModelPage(body: unknown): AnthropicModelPage {
+  const page = body as { data?: unknown, has_more?: unknown, last_id?: unknown } | null
+  const data = page?.data
   if (!Array.isArray(data)) {
     throw new Error('Claude 模型目录：接口返回中没有 data 数组')
   }
-  const models = []
+  const models: DiscoveredModel[] = []
   for (const raw of data) {
     if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) continue
-    const id = nonEmptyString(raw.id)
+    const entry = raw as Record<string, unknown>
+    const id = nonEmptyString(entry['id'])
     if (id === undefined) continue
-    const name = nonEmptyString(raw.display_name, raw.name)
-    const contextWindow = positiveInteger(raw.max_input_tokens, raw.context_window, raw.context_length)
-    const maxTokens = positiveInteger(raw.max_tokens, raw.max_output_tokens)
+    const name = nonEmptyString(entry['display_name'], entry['name'])
+    const contextWindow = positiveInteger(entry['max_input_tokens'], entry['context_window'], entry['context_length'])
+    const maxTokens = positiveInteger(entry['max_tokens'], entry['max_output_tokens'])
     models.push({
       id,
       ...name === undefined ? {} : { name },
@@ -132,19 +215,19 @@ export function readAnthropicModelPage(body) {
   }
   return {
     models,
-    hasMore: body?.has_more === true,
-    lastId: nonEmptyString(body?.last_id),
+    hasMore: page?.has_more === true,
+    lastId: nonEmptyString(page?.last_id),
   }
 }
 
 /** Fill a discovered row's capacities from the recorded Claude model table. */
-export function withKnownModelMetadata(model) {
-  const known = CLAUDE_KNOWN_MODELS[model?.id]
+export function withKnownModelMetadata(model: DiscoveredModel): DiscoveredModel {
+  const known = CLAUDE_KNOWN_MODELS[model.id]
   if (known === undefined) return model
   return { ...model, contextWindow: known.contextWindow, maxTokens: known.maxTokens }
 }
 
-function discoveryHeaders(apiKey) {
+function discoveryHeaders(apiKey: string): Headers {
   const value = requireNonEmptyString(apiKey, 'apiKey').trim()
   if (value.length === 0) throw new Error('Claude 模型目录：请先填写 API 密钥')
   try {
@@ -158,24 +241,34 @@ function discoveryHeaders(apiKey) {
   }
 }
 
-function responseErrorMessage(body) {
-  const message = body?.error?.message
+function responseErrorMessage(body: unknown): string | undefined {
+  const message = (body as { error?: { message?: unknown } } | null)?.error?.message
   return typeof message === 'string' && message.length > 0 ? message.slice(0, 500) : undefined
 }
 
+/** Inputs of one Anthropic catalogue interrogation. */
+export interface AnthropicDiscoveryOptions {
+  baseURL: string
+  apiKey: string
+  signal?: AbortSignal
+  fetchImpl?: typeof fetch
+}
+
 /** Query only the native Anthropic Models API, including cursor pagination. */
-export async function discoverAnthropicModels({ baseURL, apiKey, signal, fetchImpl = globalThis.fetch }) {
+export async function discoverAnthropicModels(
+  { baseURL, apiKey, signal, fetchImpl = globalThis.fetch }: AnthropicDiscoveryOptions,
+): Promise<DiscoveredModel[]> {
   if (typeof fetchImpl !== 'function') throw new Error('Claude 模型目录：当前运行环境没有 fetch')
   const endpoint = anthropicModelsUrl(baseURL)
   const headers = discoveryHeaders(apiKey)
-  const models = []
-  const seen = new Set()
-  let afterId
+  const models: DiscoveredModel[] = []
+  const seen = new Set<string>()
+  let afterId: string | undefined
   for (let page = 0; page < MAX_DISCOVERY_PAGES; page += 1) {
     if (signal?.aborted) throw new Error('Claude 模型目录：获取已取消')
     const url = new URL(endpoint)
     if (afterId !== undefined) url.searchParams.set('after_id', afterId)
-    let response
+    let response: Response
     try {
       response = await fetchImpl(url, { method: 'GET', headers, signal })
     } catch (error) {
@@ -183,7 +276,7 @@ export async function discoverAnthropicModels({ baseURL, apiKey, signal, fetchIm
       throw new Error(`Claude 模型目录：无法连接 ${url.origin}`, { cause: error })
     }
     const text = await readBoundedResponse(response, url.href)
-    let body
+    let body: unknown
     try {
       body = JSON.parse(text)
     } catch (error) {
@@ -212,15 +305,15 @@ export async function discoverAnthropicModels({ baseURL, apiKey, signal, fetchIm
   throw new Error(`Claude 模型目录：分页超过 ${MAX_DISCOVERY_PAGES} 页`)
 }
 
-function configuredCredentialRef(ctx, provider) {
+function configuredCredentialRef(ctx: PluginContext, provider: string | undefined): string | undefined {
   if (typeof provider !== 'string' || provider.length === 0) return undefined
   const section = ctx.get('settings')?.describe().find(entry => entry.ns === PI_AI_SETTINGS_NS)?.value
-  const profile = section?.providers?.[provider]
+  const profile = (section as { providers?: Record<string, { apiKeyEnv?: unknown }> } | undefined)?.providers?.[provider]
   const ref = profile?.apiKeyEnv
   return typeof ref === 'string' && ref.length > 0 ? ref : undefined
 }
 
-async function discoveryApiKey(ctx, request) {
+async function discoveryApiKey(ctx: PluginContext, request: DiscoveryRequest): Promise<string> {
   if (typeof request.apiKey === 'string' && request.apiKey.trim().length > 0) return request.apiKey
   const ref = configuredCredentialRef(ctx, request.provider)
   if (ref === undefined) throw new Error('Claude 模型目录：请先填写 API 密钥')
@@ -232,12 +325,13 @@ async function discoveryApiKey(ctx, request) {
 }
 
 /** Whether an explicitly registered provider belongs to this plugin's Claude type. */
-export function isClaudeProviderType(settings, provider) {
+export function isClaudeProviderType(settings: unknown, provider: string | undefined): boolean {
   if (typeof provider !== 'string' || provider.length === 0) return false
-  return settings?.providerTypes?.[provider] === CLAUDE_PROVIDER_TYPE
+  const types = (settings as { providerTypes?: Record<string, unknown> } | undefined)?.providerTypes
+  return types?.[provider] === CLAUDE_PROVIDER_TYPE
 }
 
-function installClaudeModelDiscovery(ctx) {
+function installClaudeModelDiscovery(ctx: PluginContext): void {
   const llm = ctx.llm
   const upstream = llm.discoverModels
   // DSH 0.1.2-alpha moved caller cancellation to a third positional
@@ -245,7 +339,7 @@ function installClaudeModelDiscovery(ctx) {
   // Only the plugin's own Claude surfaces send CLAUDE_DISCOVERY_API, so every
   // other provider — generic anthropic-messages routes included — keeps the
   // stock discovery behavior.
-  const wrapped = async function (settingsNs, request, signal) {
+  const wrapped: DiscoverModels = async function (this: unknown, settingsNs, request, signal) {
     if (settingsNs !== PI_AI_SETTINGS_NS || request?.api !== CLAUDE_DISCOVERY_API) {
       return upstream.call(this, settingsNs, request, signal)
     }
@@ -266,6 +360,6 @@ function installClaudeModelDiscovery(ctx) {
   })
 }
 
-export function apply(ctx) {
+export function apply(ctx: PluginContext): void {
   installClaudeModelDiscovery(ctx)
 }

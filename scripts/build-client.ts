@@ -2,14 +2,34 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
+import { CLAUDE_KNOWN_MODELS } from '../src/index.ts'
 
 const require = createRequire(import.meta.url)
 const sourcePath = require.resolve('@deepseek-ai/dsh-client-ui-settings-models/client')
 const here = dirname(fileURLToPath(import.meta.url))
 const outputPath = resolve(here, '../lib/client.js')
-let source = await readFile(sourcePath, 'utf8')
 
-function replaceOnce(label, before, after) {
+/**
+ * Read the Claude-only helper fragment as plain JavaScript, with the recorded
+ * model table inlined. The fragment is a TypeScript module spliced into the
+ * upstream bundle, so it is transpiled without a module wrapper: the bundle
+ * resolves the bindings it declares.
+ */
+async function claudeHelpers(): Promise<string> {
+  const path = new URL('./client-claude.ts', import.meta.url)
+  const source = await readFile(path, 'utf8')
+  const table = `const CLAUDE_KNOWN_MODELS = Object.freeze(${JSON.stringify(CLAUDE_KNOWN_MODELS, null, 2)})`
+  const marker = '// CLAUDE_KNOWN_MODELS 由构建脚本从 src/index.ts 的记录表注入到此处。'
+  if (!source.includes(marker)) throw new Error('build-client: Claude model table marker not found')
+  return ts.transpileModule(source.replace(marker, table), {
+    compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.None },
+    reportDiagnostics: true,
+    fileName: 'client-claude.ts',
+  }).outputText
+}
+
+function replaceOnce(label: string, before: string, after: string): void {
   const first = source.indexOf(before)
   if (first === -1) throw new Error(`build-client: ${label} anchor not found`)
   if (source.indexOf(before, first + before.length) !== -1) {
@@ -18,7 +38,7 @@ function replaceOnce(label, before, after) {
   source = source.slice(0, first) + after + source.slice(first + before.length)
 }
 
-function replaceExactly(label, before, after, expected) {
+function replaceExactly(label: string, before: string, after: string, expected: number): void {
   let count = 0
   let offset = 0
   while ((offset = source.indexOf(before, offset)) !== -1) {
@@ -31,12 +51,9 @@ function replaceExactly(label, before, after, expected) {
   source = source.replaceAll(before, after)
 }
 
+let source: string = await readFile(sourcePath, 'utf8')
+
 source = source.replaceAll('@deepseek-ai/dsh-client-ui-settings-models', '@dsh-plugin/dsh-claude-provider')
-
-const helpers = await readFile(new URL('./client-claude.js', import.meta.url), 'utf8')
-replaceOnce('Claude model helpers', '\t\t/** Stable visible and accessible identity for one provider target. */',
-  '\t\t// BEGIN CLAUDE HELPERS\n' + helpers.split('\n').map(line => line.length ? '\t\t' + line : '').join('\n') + '\n\t\t// END CLAUDE HELPERS\n\t\t/** Stable visible and accessible identity for one provider target. */')
-
 
 replaceOnce(
   'RC8 credential update compatibility',
@@ -44,37 +61,10 @@ replaceOnce(
   '\t\t\t\t\tctx.remote.$on("credentials/reference-updated", refreshModels),\n\t\t\t\t\tctx.remote.$on("credentials/updated", refreshModels),',
 )
 
-
 replaceOnce(
   'custom Claude uses native Anthropic discovery',
   '\t\t\t\t\t\t...probe.api === void 0 ? {} : { api: probe.api },',
   '\t\t\t\t\t\t...probe.api === void 0 ? {} : { api: props.thinkingPresets ? CLAUDE_DISCOVERY_API : probe.api },',
-)
-
-
-
-replaceOnce(
-  'recorded Claude model metadata',
-  '\t\tconst CLAUDE_TOGGLE_EFFORTS = Object.freeze({ off: null, high: "high" });',
-  `\t\tconst CLAUDE_TOGGLE_EFFORTS = Object.freeze({ off: null, high: "high" });
-\t\tconst CLAUDE_KNOWN_MODELS = Object.freeze({
-\t\t\t"claude-fable-5-1": Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: "five" }),\n\t\t\t"claude-fable-5": Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: "five" }),
-\t\t\t"claude-haiku-5-5": Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: "five" }),
-\t\t\t"claude-haiku-4-5-20251001": Object.freeze({ contextWindow: 200000, maxTokens: 64000, preset: "toggle" }),
-\t\t\t"claude-haiku-4-5": Object.freeze({ contextWindow: 200000, maxTokens: 64000, preset: "toggle" }),
-\t\t\t"claude-opus-4-5-20251101": Object.freeze({ contextWindow: 200000, maxTokens: 64000, preset: "toggle" }),
-\t\t\t"claude-opus-4-5": Object.freeze({ contextWindow: 200000, maxTokens: 64000, preset: "toggle" }),
-\t\t\t"claude-opus-4-6": Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: "four" }),
-\t\t\t"claude-opus-4-7": Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: "five" }),
-\t\t\t"claude-opus-4-8": Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: "five" }),
-\t\t\t"claude-opus-5": Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: "five" }),
-\t\t\t"claude-opus-5-5": Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: "five" }),
-\t\t\t"claude-sonnet-4-5-20250929": Object.freeze({ contextWindow: 200000, maxTokens: 64000, preset: "toggle" }),
-\t\t\t"claude-sonnet-4-5": Object.freeze({ contextWindow: 200000, maxTokens: 64000, preset: "toggle" }),
-\t\t\t"claude-sonnet-4-6": Object.freeze({ contextWindow: 1000000, maxTokens: 64000, preset: "four" }),
-\t\t\t"claude-sonnet-5-5": Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: "five" }),
-\t\t\t"claude-sonnet-5": Object.freeze({ contextWindow: 1000000, maxTokens: 128000, preset: "five" })
-\t\t});`,
 )
 
 replaceOnce(
@@ -94,7 +84,6 @@ replaceOnce(
   '\t\t\t\tconst next = layout === "pi-ai" && stringAt(draft, "apiKeyEnv") === void 0 && stringAt(fallback, "apiKeyEnv") === void 0 && keyValue.length > 0 ? schema.setPath(draft, ["apiKeyEnv"], keyRef) : draft;',
   '\t\t\t\tconst credentialDraft = layout === "pi-ai" && stringAt(draft, "apiKeyEnv") === void 0 && stringAt(fallback, "apiKeyEnv") === void 0 && keyValue.length > 0 ? schema.setPath(draft, ["apiKeyEnv"], keyRef) : draft;\n\t\t\t\tconst next = props.thinkingPresets === true ? withNativeClaudeProfile(credentialDraft) : credentialDraft;',
 )
-
 
 replaceOnce(
   'persist Claude provider type after profile creation',
@@ -146,7 +135,6 @@ replaceOnce(
   'const addedRows = activeCandidates.filter((candidate) => isPicked(candidate.id) && !keptIds.has(candidate.id)).map(adopt);',
   'const addedRows = activeCandidates.filter((candidate) => isPicked(candidate.id) && !keptIds.has(candidate.id)).map((candidate) => props.thinkingPresets ? withFetchedClaudeMetadata(adopt(candidate)) : adopt(candidate));',
 )
-
 
 // Keep the upstream shared row and append Claude-only controls to its expanded fields.
 
@@ -213,21 +201,30 @@ replaceOnce('Claude provider option',
   '...customEnabled ? {} : { title: t("addCustomUnavailable") }\n\t\t\t\t\t\t\t\t\t\t}],',
   '...customEnabled ? {} : { title: t("addCustomUnavailable") }\n\t\t\t\t\t\t\t\t\t\t}, { value: "claude", label: t("claudeCustomTitle"), disabled: !claudeEnabled }],')
 // Keep independent mounted cards so switching modes preserves both drafts.
-const panelStart = source.indexOf('\t\t\t\t\t\t\t\tmounted("custom") && piAi !== void 0');
-const panelEnd = source.indexOf('}) : null', panelStart) + '}) : null'.length;
-if (panelStart < 0 || panelEnd < panelStart) throw new Error('custom panel not found');
-const customPanel = source.slice(panelStart, panelEnd);
+const panelStart = source.indexOf('\t\t\t\t\t\t\t\tmounted("custom") && piAi !== void 0')
+const panelEnd = source.indexOf('}) : null', panelStart) + '}) : null'.length
+if (panelStart < 0 || panelEnd < panelStart) throw new Error('custom panel not found')
+const customPanel = source.slice(panelStart, panelEnd)
 const claudePanel = customPanel.replaceAll('"custom"', '"claude"')
   .replaceAll('-custom', '-claude')
   .replace('taken: state.rows', 'providerType: CLAUDE_PROVIDER_TYPE,\n\t\t\t\t\t\t\t\t\t\ttaken: state.rows')
-  .replace('onBusyChange: setCustomBusy', 'onBusyChange: setClaudeBusy');
-source = source.slice(0, panelEnd) + ',\n' + claudePanel + source.slice(panelEnd);
+  .replace('onBusyChange: setCustomBusy', 'onBusyChange: setClaudeBusy')
+source = source.slice(0, panelEnd) + ',\n' + claudePanel + source.slice(panelEnd)
 
 replaceOnce('hide generic hint on Claude tab', "className: ModelsSection_module_css_default[\"advancedHint\"],\n\t\t\t\t\t\t\t\t\t\tchildren: t(mode === \"catalog\" ? \"addCatalogHint\" : \"addCustomHint\")", "hidden: mode === \"claude\",\n\t\t\t\t\t\t\t\t\t\tclassName: ModelsSection_module_css_default[\"advancedHint\"],\n\t\t\t\t\t\t\t\t\t\tchildren: t(mode === \"catalog\" ? \"addCatalogHint\" : \"addCustomHint\")")
 
 replaceOnce('compact English provider tabs', 'addCatalog: "Third-party model provider",', 'addCatalog: "Third-party providers",')
 replaceOnce('compact English custom API tab', 'addCustom: "Custom model API",', 'addCustom: "Custom API",')
 
+// The helper fragment goes in last: its own text never becomes an anchor.
+const helpers = await claudeHelpers()
+replaceOnce(
+  'Claude model helpers',
+  '\t\t/** Stable visible and accessible identity for one provider target. */',
+  '\t\t// BEGIN CLAUDE HELPERS\n'
+  + helpers.split('\n').map(line => line.length ? '\t\t' + line : '').join('\n')
+  + '\n\t\t// END CLAUDE HELPERS\n\t\t/** Stable visible and accessible identity for one provider target. */',
+)
+
 await mkdir(dirname(outputPath), { recursive: true })
 await writeFile(outputPath, source)
-process.stdout.write(`${outputPath}\n`)

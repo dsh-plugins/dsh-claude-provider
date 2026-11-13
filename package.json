@@ -23,27 +23,40 @@
     "registry": "https://registry.npmjs.org/"
   },
   "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "dependencies": {
     "@deepseek-ai/schemastery": "3.18.4",
     "js-yaml": "^4.3.2"
   },
   "exports": {
-    ".": "./src/index.js",
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
     "./client": "./lib/client.js",
+    "./migrate-legacy-types": {
+      "types": "./lib/migrate-legacy-types.d.ts",
+      "default": "./lib/migrate-legacy-types.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
-    "src/index.js",
-    "lib/client.js",
+    "lib/**/*.js",
+    "lib/**/*.d.ts",
+    "src/**/*.ts",
+    "scripts/**/*.ts",
     "cordis.patch.yml",
     "README.md",
     "README.zh-CN.md",
-    "LICENSE",
-    "scripts/migrate-legacy-types.mjs"
+    "LICENSE"
   ],
   "scripts": {
-    "build": "node scripts/build-client.mjs",
-    "test": "node --test"
+    "clean": "node --input-type=module -e \"import { rmSync } from 'node:fs'; rmSync('lib', { recursive: true, force: true });\"",
+    "build": "npm run clean && tsc -p tsconfig.json && node scripts/build-client.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.scripts.json",
+    "test": "node --test \"test/*.test.ts\"",
+    "prepack": "npm run build"
   },
   "engines": {
     "node": ">=22.19"
@@ -62,6 +75,9 @@
     }
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-client-ui-settings-models": "0.2.2-rc.1"
+    "@deepseek-ai/dsh-client-ui-settings-models": "0.2.2-rc.1",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^24.13.3",
+    "typescript": "^5.9.3"
   }
 }
