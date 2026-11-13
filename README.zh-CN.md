@@ -47,7 +47,7 @@ DSH Claude Provider 为 DeepSeek Harness 提供专用的 Claude 配置界面。�
 浏览器界面使用 Web Profile：
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile web add @mofeng2223/dsh-claude-provider
+npx @deepseek-ai/dsh plugin --profile web add @dsh-plugin/dsh-claude-provider
 ```
 
 安装后需要重启对应的 DeepSeek Harness 进程。
@@ -68,13 +68,13 @@ npm pack --pack-destination dist
 将生成的包安装到 Web Profile：
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile web add ./dist/mofeng2223-dsh-claude-provider-*.tgz
+npx @deepseek-ai/dsh plugin --profile web add ./dist/dsh-plugin-dsh-claude-provider-*.tgz
 ```
 
 ## 卸载
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile web remove @mofeng2223/dsh-claude-provider
+npx @deepseek-ai/dsh plugin --profile web remove @dsh-plugin/dsh-claude-provider
 ```
 
 卸载插件不会删除官方模型配置或已经保存的凭据。已有的 Claude 提供方会继续作为普通的 `anthropic-messages` 自定义提供方保留，已保存的推理档位和自适应思考配置仍然有效。卸载后将不再提供 Claude 专用的添加／编辑界面、分页模型探测和参数预填；官方的模型探测功能仍然可用。

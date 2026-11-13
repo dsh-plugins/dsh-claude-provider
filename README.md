@@ -47,7 +47,7 @@ Compared with the official generic custom provider form, the plugin adds a dedic
 For the browser interface, install the plugin into the Web profile:
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile web add @mofeng2223/dsh-claude-provider
+npx @deepseek-ai/dsh plugin --profile web add @dsh-plugin/dsh-claude-provider
 ```
 
 Restart the corresponding DeepSeek Harness process after installation.
@@ -68,13 +68,13 @@ npm pack --pack-destination dist
 Install the generated package into the Web profile:
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile web add ./dist/mofeng2223-dsh-claude-provider-*.tgz
+npx @deepseek-ai/dsh plugin --profile web add ./dist/dsh-plugin-dsh-claude-provider-*.tgz
 ```
 
 ## Uninstall
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile web remove @mofeng2223/dsh-claude-provider
+npx @deepseek-ai/dsh plugin --profile web remove @dsh-plugin/dsh-claude-provider
 ```
 
 Uninstalling the plugin does not delete official model settings or stored credentials. Existing Claude providers remain ordinary custom `anthropic-messages` providers, and their saved reasoning levels and adaptive thinking settings remain effective. The dedicated Claude add/edit interface, paginated model discovery, and automatic defaults are no longer available; the official model discovery feature remains available.

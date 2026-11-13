@@ -1,5 +1,5 @@
 {
-  "name": "@mofeng2223/dsh-claude-provider",
+  "name": "@dsh-plugin/dsh-claude-provider",
   "version": "0.6.6",
   "description": "Custom Claude provider support for DeepSeek Harness 0.2.2-rc.1",
   "author": "mofeng2223",

@@ -31,7 +31,7 @@ function replaceExactly(label, before, after, expected) {
   source = source.replaceAll(before, after)
 }
 
-source = source.replaceAll('@deepseek-ai/dsh-client-ui-settings-models', '@mofeng2223/dsh-claude-provider')
+source = source.replaceAll('@deepseek-ai/dsh-client-ui-settings-models', '@dsh-plugin/dsh-claude-provider')
 
 const helpers = await readFile(new URL('./client-claude.js', import.meta.url), 'utf8')
 replaceOnce('Claude model helpers', '\t\t/** Stable visible and accessible identity for one provider target. */',
