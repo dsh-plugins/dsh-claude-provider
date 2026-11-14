@@ -70,13 +70,12 @@ const SECTION_LABELS: Readonly<Record<CachePosition, string>> = {
   messages: '消息',
 }
 
-/** Plugin configuration the cache plan and pre-warming read. */
+/** Plugin configuration the cache plan reads. */
 export interface CacheConfig {
   mixedEnabled: boolean
   toolsTtl: string
   systemTtl: string
   messagesTtl: string
-  prewarmProvider: string
 }
 
 /**
@@ -128,7 +127,7 @@ export function createCacheTemplate(): Template {
     packageName: CACHE_CONFIG_PACKAGE,
     title: 'Claude 提示缓存',
     description:
-      '为已选择「一小时」缓存时长的 Claude 提供商分段设置缓存存活时间，并可提前预热缓存。'
+      '为已选择「一小时」缓存时长的 Claude 提供商分段设置缓存存活时间。'
       + '一小时缓存必须排在五分钟缓存之前，工具与系统提示属于前缀，消息属于后段。'
       + '一小时写入按基础输入价的 2 倍计费。',
     fields: [
@@ -169,33 +168,20 @@ export function createCacheTemplate(): Template {
     ],
     panels: [
       {
-        id: 'prewarm',
-        title: '预热缓存',
+        id: 'plan',
+        title: '当前生效的分段时长',
         description:
-          '用该提供商最近一次请求的工具与系统提示重发一次 `max_tokens: 0` 的请求，把前缀写入缓存，'
-          + '减少首次交互的首字延迟。预热会按缓存写入计费；断点必须落在工具或系统提示上才会命中后续请求。'
-          + '使用预算思考或结构化输出的请求无法用零输出预算重放，会直接提示而不发出请求。',
-        fields: [
-          {
-            type: 'text',
-            key: 'prewarmProvider',
-            label: '提供商 ID',
-            description: '填写已标记为 Claude 类型、且本次进程内已发送过请求的提供商。',
-            default: '',
-          },
-        ],
+          '显示保存后实际发送的分段时长。一段的取值导致一小时缓存排在五分钟缓存之后时，'
+          + '相关请求不会改写，沿用它自己声明的缓存时长。',
+        // The loader requires an array here; this panel only reports, so it has
+        // nothing to edit.
+        fields: [],
         operations: [
           {
             id: 'plan',
             readOnly: true,
             autoRun: true,
             result: [{ type: 'text', title: '当前生效的分段时长' }],
-          },
-          {
-            id: 'prewarm',
-            button: { label: '预热缓存' },
-            input: ['prewarmProvider'],
-            result: [{ type: 'text', title: '预热结果' }],
           },
         ],
       },

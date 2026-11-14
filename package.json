@@ -1,6 +1,6 @@
 {
   "name": "@dsh-plugin/dsh-claude-provider",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Custom Claude provider support for DeepSeek Harness 0.2.2-rc.2 and 0.2.2-rc.3",
   "author": "mofeng2223",
   "license": "MIT",

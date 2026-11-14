@@ -44,11 +44,9 @@ This release targets DeepSeek Harness 0.2.2-rc.2 and 0.2.2-rc.3. Those versions 
 
    One-hour cache writes cost 2× base input, so they only pay off for prefixes reused across turns. The defaults therefore give tools and the system prompt an hour and keep messages on five minutes.
 
-   The bottom of the card is the pre-warm panel: name a provider, press **Pre-warm cache**, and the plugin replays that provider's last request with `max_tokens: 0`, writing the tools and system prompt into the cache so the first turn starts warmer. Pre-warming spends a cache write, and its breakpoint must land on tools or the system prompt to help later requests. A provider that has not sent a request in this process has no shape to replay and is reported as such.
+   The card ends with a read-only summary of the lifetimes a save would send. It matters because a combination the API refuses does not fail loudly: those requests keep the provider's own lifetime instead.
 
-   Two kinds of request cannot be replayed with a zero output budget, and the plugin explains why instead of sending them: budget thinking, whose `budget_tokens` is constrained against `max_tokens`, so lowering the cap either breaks that constraint or writes an entry no real request matches, and a request carrying structured-output configuration, which the adapter does not emit today and which is checked defensively. Adaptive thinking and `output_config.effort` are copied verbatim because they are rendered into the prompt, and changing them would key the entry differently.
-
-   Mixed lifetimes and pre-warming need `@dsh-plugin/dsh-loader`. A profile without it keeps the plugin's original behavior: routes still carry `cacheRetention`, and request bodies are left untouched.
+   Mixed lifetimes need `@dsh-plugin/dsh-loader`. A profile without it keeps the plugin's original behavior: routes still carry `cacheRetention`, and request bodies are left untouched.
 
 3. **Supports paginated Anthropic model discovery**
 

@@ -1,12 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  buildPrewarmBody,
-  hasPrefixBreakpoint,
   isMessagesRequest,
   mixedPlanFailure,
-  PREWARM_PLACEHOLDER,
-  prewarmShape,
   providerForUrl,
   retimeCacheTtl,
 } from '../src/cache.ts'
@@ -85,55 +81,6 @@ test('非对象请求体与缺失的段直接原样返回', () => {
   assert.deepEqual(content?.[0]?.cache_control, LONG)
 })
 
-test('预热只在工具或系统提示存在断点时可用', () => {
-  assert.equal(hasPrefixBreakpoint(body()), true)
-  assert.equal(hasPrefixBreakpoint({ messages: [{ role: 'user', content: [{ type: 'text', text: 'hi', cache_control: SHORT }] }] }), false)
-  const plan = buildPrewarmBody({ messages: [] })
-  assert.ok('reason' in plan && plan.reason.includes('断点'))
-})
-
-test('预热请求替换对话并把输出上限设为 0', () => {
-  const plan = buildPrewarmBody(body())
-  assert.ok('body' in plan, '有前缀断点的请求应能预热')
-  const prewarm = plan.body as Record<string, unknown>
-  assert.equal(prewarm['max_tokens'], 0)
-  assert.equal(prewarm['stream'], false)
-  assert.deepEqual(prewarm['messages'], [{ role: 'user', content: PREWARM_PLACEHOLDER }])
-  assert.deepEqual((prewarm['system'] as { cache_control?: unknown }[])[0]?.cache_control, SHORT)
-  assert.equal(prewarm['model'], 'claude-opus-5')
-})
-
-test('零输出预算无法表达的请求被拒绝而非改写', () => {
-  const budgetThinking = buildPrewarmBody({ ...body(), thinking: { type: 'enabled', budget_tokens: 4096 } })
-  assert.ok('reason' in budgetThinking && budgetThinking.reason.includes('预算思考'))
-
-  const structured = buildPrewarmBody({ ...body(), output_config: { format: { type: 'json_schema' } } })
-  assert.ok('reason' in structured && structured.reason.includes('结构化输出'))
-
-  const nonObject = buildPrewarmBody([])
-  assert.ok('reason' in nonObject)
-})
-
-test('流式请求照常预热，因为 stream 描述的是响应而非缓存前缀', () => {
-  const plan = buildPrewarmBody({ ...body(), stream: true })
-  assert.ok('body' in plan)
-  assert.equal((plan.body as Record<string, unknown>)['stream'], false)
-})
-
-test('自适应思考与 effort 原样保留，tool_choice 被移除', () => {
-  const plan = buildPrewarmBody({
-    ...body(),
-    thinking: { type: 'adaptive', display: 'summarized' },
-    output_config: { effort: 'high' },
-    tool_choice: { type: 'any' },
-  })
-  assert.ok('body' in plan)
-  const prewarm = plan.body as Record<string, unknown>
-  assert.deepEqual(prewarm['thinking'], { type: 'adaptive', display: 'summarized' })
-  assert.deepEqual(prewarm['output_config'], { effort: 'high' })
-  assert.equal('tool_choice' in prewarm, false)
-})
-
 test('路由按分隔符边界与最长前缀匹配请求 URL', () => {
   const bases = new Map([
     ['gateway', 'https://api.example.com'],
@@ -176,15 +123,6 @@ test('已符合目标时长的断点不被重写', () => {
   assert.equal('ttl' in control, false)
 })
 
-test('预热形态丢弃对话，因为重放会替换它', () => {
-  const full = { model: 'claude-opus-5', tools: [{ name: 'read' }], messages: [{ role: 'user', content: 'hi' }] }
-  const shape = prewarmShape(full) as Record<string, unknown>
-  assert.equal('messages' in shape, false)
-  assert.deepEqual(shape['tools'], [{ name: 'read' }])
-  assert.equal(shape['model'], 'claude-opus-5')
-  assert.equal(prewarmShape(null), null)
-})
-
 test('只有带 anthropic-version 头的 POST messages 请求会被改写', () => {
   const versioned = new Headers({ 'anthropic-version': '2023-06-01' })
   const openai = new Headers({ authorization: 'Bearer sk-test' })
@@ -201,7 +139,7 @@ test('配置默认值与当前生效方案可读', () => {
   assert.equal(cacheTtlOf(undefined), 'short')
   assert.equal(cacheTtlOf('bogus'), 'short')
 
-  const defaults = { mixedEnabled: true, toolsTtl: 'long', systemTtl: 'long', messagesTtl: 'short', prewarmProvider: '' }
+  const defaults = { mixedEnabled: true, toolsTtl: 'long', systemTtl: 'long', messagesTtl: 'short' }
   assert.deepEqual(cachePlanOf(defaults), { tools: 'long', system: 'long', messages: 'short' })
   assert.match(describePlan(defaults), /当前组合生效/)
   assert.match(describePlan(defaults), /工具定义一小时/)

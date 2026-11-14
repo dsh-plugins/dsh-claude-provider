@@ -1,5 +1,5 @@
 /**
- * Request-body rewriting for Anthropic prompt-cache TTLs and cache pre-warming.
+ * Request-body rewriting for Anthropic prompt-cache TTLs.
  *
  * `pi-ai` stamps one `cache_control` object onto every breakpoint it creates, so
  * a route can only ask for a single TTL. The Claude API accepts mixed TTLs as
@@ -8,11 +8,6 @@
  * per section. These helpers rewrite a serialized request body without mutating
  * the caller's value, so the fetch patch can send a request the adapter itself
  * cannot express.
- *
- * Pre-warming follows the same shape: replay a remembered body with
- * `max_tokens: 0`, keep an explicit breakpoint on the shared tools and system
- * blocks, and replace the conversation with a placeholder so the written entry
- * is keyed to the prefix the next real request reuses.
  */
 
 /** Section of a Messages request that carries cache breakpoints, in prefix order. */
@@ -29,9 +24,6 @@ export type MixedTtlPlan = Readonly<Record<CachePosition, CacheTtl>>
 
 /** TTL the wire protocol spells for a one-hour breakpoint. */
 const LONG_TTL = '1h'
-
-/** Placeholder user turn a pre-warm request must carry. */
-export const PREWARM_PLACEHOLDER = 'warmup'
 
 /**
  * Whether one section assignment can be sent at all.
@@ -147,97 +139,6 @@ export function retimeCacheTtl(body: unknown, plan: MixedTtlPlan): { body: unkno
     },
     changed: true,
   }
-}
-
-/**
- * Whether one body carries any breakpoint outside the conversation.
- *
- * A pre-warm writes cache entries only where a breakpoint already exists, and
- * the conversation is replaced, so a body whose only breakpoint sits on the last
- * message would write an entry keyed to the placeholder.
- * @param body - the parsed Messages request body.
- * @returns whether a tools or system breakpoint exists.
- */
-export function hasPrefixBreakpoint(body: unknown): boolean {
-  if (!isRecord(body)) return false
-  for (const section of ['tools', 'system'] as const) {
-    const blocks = body[section]
-    if (!Array.isArray(blocks)) continue
-    if (blocks.some(block => isRecord(block) && 'cache_control' in block)) return true
-  }
-  return false
-}
-
-/**
- * Outcome of planning a pre-warm request.
- *
- * The API accepts `max_tokens: 0` only for a request that produces no output, so
- * a body asking for something the zero budget cannot express has to be reported
- * instead of replayed: sending it earns a 400, and rewriting the field would
- * write a cache entry the real request never hits.
- */
-export type PrewarmPlan = { body: unknown } | { reason: string }
-
-/**
- * Narrow a captured request body to the fields a pre-warm replays.
- *
- * A replay resends tools and system unchanged and replaces the conversation, so
- * the conversation is the one thing worth dropping: in a long session it is
- * where the images and tool results live, and holding them per provider would
- * pin tens of megabytes for a request that never reads them again.
- * @param body - the parsed body of a real request.
- * @returns the same body without its conversation, or the input when it is not a record.
- */
-export function prewarmShape(body: unknown): unknown {
-  if (!isRecord(body)) return body
-  const rest = { ...body }
-  delete rest['messages']
-  return rest
-}
-
-/**
- * Build the pre-warm request for a remembered body.
- *
- * The conversation is replaced rather than trimmed: a pre-warm is meant to
- * write the prefix the next real request reuses, and keeping the old turns
- * would key the entry to content the next request no longer sends first.
- *
- * `thinking` and `output_config.effort` are copied untouched because the API
- * renders them into the prompt, so a pre-warm that changed them would write an
- * entry the follow-up request never matches. Budget thinking therefore refuses
- * the replay instead: its `budget_tokens` derives from `max_tokens`, so a
- * zero-output cap would either spend the budget or write a differently keyed
- * entry. `stream` is the one field this function may safely lower, because it
- * describes the response rather than the cached prefix.
- * @param body - the parsed body of a previous real request.
- * @returns the pre-warm body, or why this request cannot be pre-warmed.
- */
-export function buildPrewarmBody(body: unknown): PrewarmPlan {
-  if (!isRecord(body)) return { reason: '最近的请求体不是 JSON 对象，无法重放' }
-  if (!hasPrefixBreakpoint(body)) {
-    return { reason: '请求没有工具或系统提示断点，预热不会命中后续请求' }
-  }
-  const thinking = body['thinking']
-  if (isRecord(thinking) && thinking['type'] === 'enabled') {
-    return {
-      reason: '该请求使用预算思考，思考预算由 max_tokens 推导，零输出重放会写入真实请求无法命中的缓存条目',
-    }
-  }
-  const output = body['output_config']
-  if (isRecord(output) && output['format'] !== undefined) {
-    return { reason: '该请求要求结构化输出，而 max_tokens: 0 不接受结构化输出' }
-  }
-  const next: Record<string, unknown> = {
-    ...body,
-    max_tokens: 0,
-    stream: false,
-    messages: [{ role: 'user', content: PREWARM_PLACEHOLDER }],
-  }
-  // `tool_choice` only affects message blocks, and the messages are replaced,
-  // so dropping it keeps the cached prefix identical while avoiding the
-  // `tool` and `any` variants a zero budget rejects.
-  delete next['tool_choice']
-  return { body: next }
 }
 
 /**

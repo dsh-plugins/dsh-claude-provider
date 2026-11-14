@@ -1,9 +1,7 @@
 import z from '@deepseek-ai/schemastery'
 import {
-  buildPrewarmBody,
   isMessagesRequest,
   mixedPlanFailure,
-  prewarmShape,
   providerForUrl,
   retimeCacheTtl,
 } from './cache.ts'
@@ -354,13 +352,6 @@ function installClaudeModelDiscovery(ctx: PluginContext): void {
   })
 }
 
-/** One remembered Messages request a pre-warm can replay. */
-interface RememberedRequest {
-  url: string
-  headers: Headers
-  body: unknown
-}
-
 /** Configuration and patch faces the cache control uses when loader provides them. */
 interface CacheLoaderFace {
   config: {
@@ -452,16 +443,11 @@ function installCacheControl(ctx: PluginContext): void {
     // without a reload. `undefined` means no rewriting: the switch is off, or
     // the assignment describes an order the API refuses.
     let plan: MixedTtlPlan | undefined
-    const remembered = new Map<string, RememberedRequest>()
     const original = globalThis.fetch
     if (typeof original !== 'function') {
-      sub.logger?.warn('[claude-provider] 全局 fetch 不可用；混合缓存与预热失效')
+      sub.logger?.warn('[claude-provider] 全局 fetch 不可用；混合缓存失效')
       return
     }
-    // Pre-warming replays through the fetch captured here rather than through
-    // the global: the patch below would otherwise remember the replay itself as
-    // the provider's latest request and lose the real shape it replaces.
-    const prewarmFetch = original
     sub.effect(() => {
       let disposed = false
       void loader.config.register<CacheConfig>(sub, createCacheTemplate()).then((handle) => {
@@ -485,10 +471,9 @@ function installCacheControl(ctx: PluginContext): void {
           const value = (request as { config?: { value?: CacheConfig } } | undefined)?.config?.value
           return { value: value === undefined ? '尚未读取到配置。' : describePlan(value) }
         })
-        handle.registerOperation('prewarm', async (request: unknown) => prewarm(remembered, request, sub, prewarmFetch))
         if (disposed) handle.dispose()
       }).catch((error: unknown) => {
-        sub.logger?.warn('[claude-provider] 缓存配置注册失败；分段缓存与预热不可用', error)
+        sub.logger?.warn('[claude-provider] 缓存配置注册失败；分段缓存不可用', error)
       })
       return () => { disposed = true }
     })
@@ -514,75 +499,12 @@ function installCacheControl(ctx: PluginContext): void {
         sub.logger?.warn(`[claude-provider] ${provider} 的请求体不是 JSON，跳过缓存改写`, error)
         return upstream.call(this, input, init)
       }
-      // The body is remembered whether or not it is rewritten: a pre-warm
-      // replays the request shape the provider just accepted, and the section
-      // switch must not decide whether pre-warming can find a prefix. Only the
-      // fields a replay needs are kept, because a long conversation carries
-      // images and tool results this plugin never reads again.
-      remembered.set(provider, { url, headers, body: prewarmShape(parsed) })
       if (plan === undefined) return upstream.call(this, input, init)
       const { body, changed } = retimeCacheTtl(parsed, plan)
       if (!changed) return upstream.call(this, input, init)
       return upstream.call(this, input, { ...init, body: JSON.stringify(body) })
     }, { id: 'claude-provider:cache-ttl', owner: sub })
   })
-}
-
-/**
- * Replay one provider's last request with `max_tokens: 0`.
- *
- * Pre-warming spends a cache write on purpose, so it runs only when the user
- * asks for it and reports what the endpoint answered.
- * @param remembered - captured requests by provider.
- * @param request - operation request naming the provider.
- * @param ctx - context used for logging.
- * @param send - the fetch to replay through, bypassing this plugin's own patch.
- * @returns the operation result shown on the settings page.
- */
-async function prewarm(
-  remembered: Map<string, RememberedRequest>,
-  request: unknown,
-  ctx: PluginContext,
-  send: typeof fetch,
-): Promise<{ value: unknown }> {
-  const { input, signal } = (request ?? {}) as { input?: { prewarmProvider?: unknown }, signal?: AbortSignal }
-  const provider = input?.prewarmProvider
-  const names = [...remembered.keys()]
-  if (typeof provider !== 'string' || !remembered.has(provider)) {
-    return { value: names.length === 0 ? '尚无可预热的请求：先在该提供商上发送一次对话。' : `可预热的提供商：${names.join('、')}` }
-  }
-  const captured = remembered.get(provider) as RememberedRequest
-  const planned = buildPrewarmBody(captured.body)
-  if ('reason' in planned) {
-    return { value: `${provider} 无法预热：${planned.reason}。` }
-  }
-  let response: Response
-  try {
-    response = await send(captured.url, {
-      method: 'POST',
-      headers: captured.headers,
-      body: JSON.stringify(planned.body),
-      ...(signal === undefined ? {} : { signal }),
-    })
-  } catch (error) {
-    if (signal?.aborted) return { value: `${provider} 预热已取消。` }
-    return { value: `${provider} 预热失败：${error instanceof Error ? error.message : String(error)}` }
-  }
-  const text = await response.text()
-  if (!response.ok) {
-    return { value: `${provider} 预热失败：HTTP ${response.status} ${text.slice(0, 300)}` }
-  }
-  let written: unknown
-  try {
-    written = (JSON.parse(text) as { usage?: { cache_creation_input_tokens?: unknown } }).usage?.cache_creation_input_tokens
-  } catch (error) {
-    ctx.logger?.warn(`[claude-provider] ${provider} 预热响应不是 JSON`, error)
-  }
-  return {
-    value: typeof written === 'number'
-      ? `${provider} 预热完成，写入缓存 ${String(written)} 个 token。`
-      : `${provider} 预热完成。`,
-  }
 }
 
 export function apply(ctx: PluginContext): void {
