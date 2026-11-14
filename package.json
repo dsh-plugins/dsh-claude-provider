@@ -7,11 +7,11 @@
   "icon": "./icon.svg",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MoFeng2223/dsh-claude-provider.git"
+    "url": "git+https://github.com/dsh-plugins/dsh-claude-provider.git"
   },
-  "homepage": "https://github.com/MoFeng2223/dsh-claude-provider#readme",
+  "homepage": "https://github.com/dsh-plugins/dsh-claude-provider#readme",
   "bugs": {
-    "url": "https://github.com/MoFeng2223/dsh-claude-provider/issues"
+    "url": "https://github.com/dsh-plugins/dsh-claude-provider/issues"
   },
   "keywords": [
     "deepseek-harness",

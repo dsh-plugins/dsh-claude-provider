@@ -65,7 +65,7 @@ npx @deepseek-ai/dsh plugin --profile web add @dsh-plugin/dsh-claude-provider
 先克隆、构建并打包项目：
 
 ```sh
-git clone https://github.com/MoFeng2223/dsh-claude-provider.git
+git clone https://github.com/dsh-plugins/dsh-claude-provider.git
 cd dsh-claude-provider
 npm ci
 npm run build

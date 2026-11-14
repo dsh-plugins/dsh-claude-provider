@@ -65,7 +65,7 @@ Restart the corresponding DeepSeek Harness process after installation.
 Clone, build, and package the repository first:
 
 ```sh
-git clone https://github.com/MoFeng2223/dsh-claude-provider.git
+git clone https://github.com/dsh-plugins/dsh-claude-provider.git
 cd dsh-claude-provider
 npm ci
 npm run build
