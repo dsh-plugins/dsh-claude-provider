@@ -40,56 +40,80 @@ const CLAUDE_COPY: Readonly<Record<string, Readonly<Record<string, string>>>> = 
     claudeTypeTag: 'Claude provider',
     claudeAdaptiveThinking: 'Adaptive thinking',
     claudeAdaptiveHelpLabel: 'Adaptive thinking help',
-    claudeAdaptiveHelp: 'For Anthropic-compatible models that support adaptive thinking. When enabled, the model adjusts its thinking based on task complexity and your selected reasoning level. When disabled, it uses the thinking token limit associated with that level.',
+    claudeAdaptiveHelp: 'For Anthropic-compatible models that support adaptive thinking. When enabled, the model adjusts its thinking based on task complexity and your selected reasoning level. When disabled, it uses the thinking token limit associated with that level. A model that always reasons keeps this on.',
+    claudeEmptySignature: 'Accept empty thinking signatures',
+    claudeEmptySignatureHelpLabel: 'Empty thinking signature help',
+    claudeEmptySignatureHelp: 'For Anthropic-compatible endpoints that emit and accept thinking blocks carrying an empty signature. When enabled, such a block is replayed as a thinking block instead of being converted to text. Leave it off for the official Anthropic API, which rejects an empty signature.',
   },
   zh: {
     claudeTab: 'Claude 提供商',
     claudeTypeTag: 'Claude 提供商',
     claudeAdaptiveThinking: '自适应思考',
     claudeAdaptiveHelpLabel: '自适应思考说明',
-    claudeAdaptiveHelp: '适用于支持自适应思考的 Anthropic 兼容模型。开启后，模型根据任务难度和你选择的推理等级自动调整思考量；关闭后，改用该等级对应的思考 token 数量上限。',
+    claudeAdaptiveHelp: '适用于支持自适应思考的 Anthropic 兼容模型。开启后，模型根据任务难度和你选择的推理等级自动调整思考量；关闭后，改用该等级对应的思考 token 数量上限。必须思考的模型保持开启且不可更改。',
+    claudeEmptySignature: '接受空思考签名',
+    claudeEmptySignatureHelpLabel: '空思考签名说明',
+    claudeEmptySignatureHelp: '适用于会发出并接受空签名思考块的 Anthropic 兼容端点。开启后，这类块按思考块回传，而不是被转换成正文。官方 Anthropic API 会拒绝空签名，请保持关闭。',
   },
   ja: {
     claudeTab: 'Claudeプロバイダー',
     claudeTypeTag: 'Claudeプロバイダー',
     claudeAdaptiveThinking: '適応型思考',
     claudeAdaptiveHelpLabel: '適応型思考の説明',
-    claudeAdaptiveHelp: '適応型思考に対応するAnthropic互換モデル向けです。有効にすると、タスクの複雑さと選択した推論レベルに応じて思考量を自動調整します。無効にすると、そのレベルに対応する思考トークン上限を使用します。',
+    claudeAdaptiveHelp: '適応型思考に対応するAnthropic互換モデル向けです。有効にすると、タスクの複雑さと選択した推論レベルに応じて思考量を自動調整します。無効にすると、そのレベルに対応する思考トークン上限を使用します。常に思考するモデルでは有効のまま変更できません。',
+    claudeEmptySignature: '空の思考署名を許可',
+    claudeEmptySignatureHelpLabel: '空の思考署名の説明',
+    claudeEmptySignatureHelp: '空の署名を持つ思考ブロックを送信・受理するAnthropic互換エンドポイント向けです。有効にすると、そのブロックは本文に変換されず思考ブロックとして再送されます。公式Anthropic APIは空の署名を拒否するため、無効のままにしてください。',
   },
   es: {
     claudeTab: 'Proveedor Claude',
     claudeTypeTag: 'Proveedor Claude',
     claudeAdaptiveThinking: 'Pensamiento adaptativo',
     claudeAdaptiveHelpLabel: 'Ayuda sobre el pensamiento adaptativo',
-    claudeAdaptiveHelp: 'Para modelos compatibles con Anthropic que admiten pensamiento adaptativo. Al activarlo, el modelo ajusta su pensamiento según la complejidad de la tarea y el nivel de razonamiento elegido. Al desactivarlo, usa el límite de tokens de pensamiento asociado a ese nivel.',
+    claudeAdaptiveHelp: 'Para modelos compatibles con Anthropic que admiten pensamiento adaptativo. Al activarlo, el modelo ajusta su pensamiento según la complejidad de la tarea y el nivel de razonamiento elegido. Al desactivarlo, usa el límite de tokens de pensamiento asociado a ese nivel. Un modelo que siempre razona mantiene la opción activada.',
+    claudeEmptySignature: 'Aceptar firmas de pensamiento vacías',
+    claudeEmptySignatureHelpLabel: 'Ayuda sobre las firmas de pensamiento vacías',
+    claudeEmptySignatureHelp: 'Para puntos finales compatibles con Anthropic que emiten y aceptan bloques de pensamiento con firma vacía. Al activarlo, ese bloque se reenvía como bloque de pensamiento en lugar de convertirse en texto. Déjelo desactivado para la API oficial de Anthropic, que rechaza una firma vacía.',
   },
   fr: {
     claudeTab: 'Fournisseur Claude',
     claudeTypeTag: 'Fournisseur Claude',
     claudeAdaptiveThinking: 'Réflexion adaptative',
     claudeAdaptiveHelpLabel: 'Aide sur la réflexion adaptative',
-    claudeAdaptiveHelp: 'Pour les modèles compatibles Anthropic qui prennent en charge la réflexion adaptative. Une fois activée, le modèle ajuste sa réflexion selon la complexité de la tâche et le niveau de raisonnement choisi. Une fois désactivée, il utilise la limite de jetons de réflexion associée à ce niveau.',
+    claudeAdaptiveHelp: 'Pour les modèles compatibles Anthropic qui prennent en charge la réflexion adaptative. Une fois activée, le modèle ajuste sa réflexion selon la complexité de la tâche et le niveau de raisonnement choisi. Une fois désactivée, il utilise la limite de jetons de réflexion associée à ce niveau. Un modèle qui réfléchit toujours conserve l\'option activée.',
+    claudeEmptySignature: 'Accepter les signatures de réflexion vides',
+    claudeEmptySignatureHelpLabel: 'Aide sur les signatures de réflexion vides',
+    claudeEmptySignatureHelp: 'Pour les points de terminaison compatibles Anthropic qui émettent et acceptent des blocs de réflexion à signature vide. Une fois activé, un tel bloc est renvoyé comme bloc de réflexion au lieu d\'être converti en texte. Laissez cette option désactivée pour l\'API Anthropic officielle, qui refuse une signature vide.',
   },
   de: {
     claudeTab: 'Claude-Anbieter',
     claudeTypeTag: 'Claude-Anbieter',
     claudeAdaptiveThinking: 'Adaptives Denken',
     claudeAdaptiveHelpLabel: 'Hilfe zum adaptiven Denken',
-    claudeAdaptiveHelp: 'Für Anthropic-kompatible Modelle, die adaptives Denken unterstützen. Aktiviert passt das Modell sein Denken an die Aufgabenkomplexität und die gewählte Denkstufe an. Deaktiviert verwendet es das Denk-Token-Limit der jeweiligen Stufe.',
+    claudeAdaptiveHelp: 'Für Anthropic-kompatible Modelle, die adaptives Denken unterstützen. Aktiviert passt das Modell sein Denken an die Aufgabenkomplexität und die gewählte Denkstufe an. Deaktiviert verwendet es das Denk-Token-Limit der jeweiligen Stufe. Ein Modell, das immer denkt, behält die Option aktiviert.',
+    claudeEmptySignature: 'Leere Denk-Signaturen akzeptieren',
+    claudeEmptySignatureHelpLabel: 'Hilfe zu leeren Denk-Signaturen',
+    claudeEmptySignatureHelp: 'Für Anthropic-kompatible Endpunkte, die Denkblöcke mit leerer Signatur senden und akzeptieren. Aktiviert wird ein solcher Block als Denkblock zurückgesendet, statt in Text umgewandelt zu werden. Lassen Sie die Option für die offizielle Anthropic-API deaktiviert, die eine leere Signatur ablehnt.',
   },
   ru: {
     claudeTab: 'Провайдер Claude',
     claudeTypeTag: 'Провайдер Claude',
     claudeAdaptiveThinking: 'Адаптивное мышление',
     claudeAdaptiveHelpLabel: 'Справка об адаптивном мышлении',
-    claudeAdaptiveHelp: 'Для Anthropic-совместимых моделей с поддержкой адаптивного мышления. Когда включено, модель подстраивает объём мышления под сложность задачи и выбранный уровень рассуждений. Когда выключено, используется лимит токенов мышления этого уровня.',
+    claudeAdaptiveHelp: 'Для Anthropic-совместимых моделей с поддержкой адаптивного мышления. Когда включено, модель подстраивает объём мышления под сложность задачи и выбранный уровень рассуждений. Когда выключено, используется лимит токенов мышления этого уровня. Модель, которая размышляет всегда, оставляет параметр включённым.',
+    claudeEmptySignature: 'Принимать пустые подписи мышления',
+    claudeEmptySignatureHelpLabel: 'Справка о пустых подписях мышления',
+    claudeEmptySignatureHelp: 'Для Anthropic-совместимых эндпоинтов, которые отправляют и принимают блоки мышления с пустой подписью. Когда включено, такой блок возвращается как блок мышления, а не преобразуется в текст. Для официального API Anthropic оставьте параметр выключенным: он отклоняет пустую подпись.',
   },
   pt: {
     claudeTab: 'Provedor Claude',
     claudeTypeTag: 'Provedor Claude',
     claudeAdaptiveThinking: 'Pensamento adaptativo',
     claudeAdaptiveHelpLabel: 'Ajuda sobre pensamento adaptativo',
-    claudeAdaptiveHelp: 'Para modelos compatíveis com Anthropic que oferecem pensamento adaptativo. Quando ativado, o modelo ajusta o pensamento conforme a complexidade da tarefa e o nível de raciocínio escolhido. Quando desativado, usa o limite de tokens de pensamento associado a esse nível.',
+    claudeAdaptiveHelp: 'Para modelos compatíveis com Anthropic que oferecem pensamento adaptativo. Quando ativado, o modelo ajusta o pensamento conforme a complexidade da tarefa e o nível de raciocínio escolhido. Quando desativado, usa o limite de tokens de pensamento associado a esse nível. Um modelo que sempre raciocina mantém a opção ativada.',
+    claudeEmptySignature: 'Aceitar assinaturas de pensamento vazias',
+    claudeEmptySignatureHelpLabel: 'Ajuda sobre assinaturas de pensamento vazias',
+    claudeEmptySignatureHelp: 'Para endpoints compatíveis com Anthropic que emitem e aceitam blocos de pensamento com assinatura vazia. Quando ativado, esse bloco é reenviado como bloco de pensamento em vez de ser convertido em texto. Mantenha desativado para a API oficial da Anthropic, que recusa uma assinatura vazia.',
   },
 }
 
@@ -105,12 +129,16 @@ const LOCALE_TERMINATORS: Readonly<Record<string, string>> = {
   pt: "  keyRequired: 'Insira uma chave de API para continuar.',",
 }
 
-/** Render one dictionary's Claude copy as source lines. */
+/**
+ * Render one dictionary's Claude copy as source lines. Values are emitted as
+ * JSON string literals because the translated copy contains apostrophes that a
+ * single-quoted literal would terminate.
+ */
 function claudeCopyLines(locale: string): string {
   const copy = CLAUDE_COPY[locale]
   if (copy === undefined) throw new Error(`client-patches: no Claude copy for locale ${locale}`)
   return Object.entries(copy)
-    .map(([key, value]) => `  ${key}: ${JSON.stringify(value).replace(/^"|"$/g, "'")},`)
+    .map(([key, value]) => `  ${key}: ${JSON.stringify(value)},`)
     .join('\n')
 }
 
@@ -354,7 +382,8 @@ function renderProviderEditor({ target, row, ...props }: ProviderEditorRenderPro
     before: "import { protocolNeedsKey, protocolReasoningLevels } from './protocol-rules.ts'",
     after: `import { protocolNeedsKey, protocolReasoningLevels } from './protocol-rules.ts'
 import { CLAUDE_DISCOVERY_API, CLAUDE_PROVIDER_SETTINGS_NS, CLAUDE_PROVIDER_TYPE } from './claude-types.ts'
-import { withNativeClaudeModel, withNativeClaudeProfile } from './claude-models.ts'`,
+import { withNativeClaudeModel, withNativeClaudeProfile } from './claude-models.ts'
+import { ClaudeEmptySignature } from './claude-empty-signature.tsx'`,
   },
   {
     file: 'client/CustomProviderCard.tsx',
@@ -374,7 +403,8 @@ import { withNativeClaudeModel, withNativeClaudeProfile } from './claude-models.
     label: 'Claude card state',
     before: "  const [protocol, setProtocol] = useState(protocols[0] ?? '')",
     after: `  const isAdaptiveClaude = props.providerType === CLAUDE_PROVIDER_TYPE
-  const [protocol, setProtocol] = useState(isAdaptiveClaude ? 'anthropic-messages' : protocols[0] ?? '')`,
+  const [protocol, setProtocol] = useState(isAdaptiveClaude ? 'anthropic-messages' : protocols[0] ?? '')
+  const [emptySignature, setEmptySignature] = useState(false)`,
   },
   {
     file: 'client/CustomProviderCard.tsx',
@@ -383,7 +413,8 @@ import { withNativeClaudeModel, withNativeClaudeProfile } from './claude-models.
     after: `        api: isAdaptiveClaude ? 'anthropic-messages' : protocol,
         baseURL: normalizedBaseURL,
         models: models.map(model => isAdaptiveClaude ? withNativeClaudeModel(model) : { ...model }),
-        ...isAdaptiveClaude ? { reasoning: 'high' } : {},`,
+        ...isAdaptiveClaude ? { reasoning: 'high' } : {},
+        ...isAdaptiveClaude && emptySignature ? { compat: { allowEmptySignature: true } } : {},`,
   },
   {
     file: 'client/CustomProviderCard.tsx',
@@ -436,6 +467,24 @@ import { withNativeClaudeModel, withNativeClaudeProfile } from './claude-models.
         thinkingPresets={isAdaptiveClaude}
         operations={operations}`,
   },
+  {
+    file: 'client/CustomProviderCard.tsx',
+    label: 'Claude card empty signature switch',
+    before: '        onBusyChange={setListBusy}\n      />\n',
+    after: `        onBusyChange={setListBusy}
+      />
+      {isAdaptiveClaude
+        ? (
+          <ClaudeEmptySignature
+            checked={emptySignature}
+            disabled={profileDisabled}
+            t={t}
+            onChange={setEmptySignature}
+          />
+        )
+        : null}
+`,
+  },
 
   // ---- ProviderEditor: saving a Claude profile keeps its native shape ----
   {
@@ -456,7 +505,8 @@ import { withNativeClaudeModel, withNativeClaudeProfile } from './claude-models.
     before: "import { RetryPolicyEditor, retryPolicyDefaults, retryPolicyFailure } from './RetryPolicyEditor.tsx'",
     after: `import { RetryPolicyEditor, retryPolicyDefaults, retryPolicyFailure } from './RetryPolicyEditor.tsx'
 import { CLAUDE_DISCOVERY_API, CLAUDE_PROVIDER_TYPE } from './claude-types.ts'
-import { withNativeClaudeProfile } from './claude-models.ts'`,
+import { withNativeClaudeProfile } from './claude-models.ts'
+import { ClaudeEmptySignature } from './claude-empty-signature.tsx'`,
   },
   {
     file: 'client/ProviderEditor.tsx',
@@ -492,6 +542,32 @@ import { withNativeClaudeProfile } from './claude-models.ts'`,
                   reasoningLevelsOnly={reasoning.levelsOnly}
                   thinkingPresets={props.thinkingPresets === true}
                   adaptiveFallback={schema.getPath(draft, ['compat', 'forceAdaptiveThinking'])}`,
+  },
+  {
+    file: 'client/ProviderEditor.tsx',
+    label: 'Claude editor empty signature switch',
+    before: '                />\n              )}\n          </div>\n        </details>}',
+    after: `                />
+              )}
+            {props.thinkingPresets === true
+              ? (
+                <ClaudeEmptySignature
+                  checked={schema.getPath(draft, ['compat', 'allowEmptySignature']) === true}
+                  disabled={disabled}
+                  t={t}
+                  onChange={(enabled) => {
+                    // The official API rejects an empty signature, so clearing
+                    // the switch removes the field rather than recording false:
+                    // an absent key inherits the adapter's own decision.
+                    setDraft(current => enabled
+                      ? schema.setPath(current, ['compat', 'allowEmptySignature'], true)
+                      : schema.deletePath(current, ['compat', 'allowEmptySignature']))
+                  }}
+                />
+              )
+              : null}
+          </div>
+        </details>}`,
   },
 
   // ---- ModelListEditor: Claude defaults for adopted and edited rows ----
@@ -601,7 +677,7 @@ import { CLAUDE_KNOWN_MODELS } from './claude-types.ts'`,
     label: 'Claude reasoning defaults',
     before: "  const initialEntries = INITIAL_LEVELS.filter(level => levels.includes(level)).map(level => [level, defaultValue(level)] as const)",
     after: `  const initialEntries = props.claude === true
-    ? Object.entries(reasoningEffortsForPreset(CLAUDE_KNOWN_MODELS[model.id]?.preset ?? 'five'))
+    ? Object.entries(reasoningEffortsForModel(model.id))
     : INITIAL_LEVELS.filter(level => levels.includes(level)).map(level => [level, defaultValue(level)] as const)`,
   },
   {
@@ -610,22 +686,42 @@ import { CLAUDE_KNOWN_MODELS } from './claude-types.ts'`,
     before: "import { modelDrafts } from './DeepSeekModelsEditor.tsx'",
     after: `import { modelDrafts } from './DeepSeekModelsEditor.tsx'
 import { ClaudeAdaptiveThinking } from './claude-adaptive-thinking.tsx'
-import { reasoningEffortsForPreset } from './claude-models.ts'
-import { CLAUDE_KNOWN_MODELS } from './claude-types.ts'`,
+import { reasoningEffortsForModel } from './claude-models.ts'`,
   },
   {
     file: 'client/ModelReasoningEfforts.tsx',
     label: 'Claude reasoning props',
-    before: '/** Props of {@link ModelReasoningEfforts}. */',
-    after: `/** Props of {@link ModelReasoningEfforts}. */
-interface ClaudeReasoningProps {
-  /** Whether this row belongs to a Claude route. */
+    before: 'interface ModelReasoningEffortsProps {',
+    after: `interface ModelReasoningEffortsProps {
+  /** Whether this row belongs to a Claude route and shows the adaptive switch. */
   claude?: boolean
   /** The provider-wide adaptive-thinking value this row inherits. */
-  adaptiveFallback?: unknown
+  adaptiveFallback?: unknown`,
+  },
+  {
+    file: 'client/ModelReasoningEfforts.tsx',
+    label: 'Claude adaptive switch',
+    before: '          </>\n        )}\n    </div>\n  )\n}\n',
+    after: `          </>
+        )}
+      {/* The adaptive switch is a separate axis from the reasoning levels, so
+          it renders below them rather than inside their toggle. */}
+      {props.claude === true
+        ? (
+          <ClaudeAdaptiveThinking
+            model={model}
+            inherited={props.adaptiveFallback}
+            position={position}
+            disabled={disabled}
+            t={t}
+            onChange={onChange}
+          />
+        )
+        : null}
+    </div>
+  )
 }
-
-/** Props of {@link ModelReasoningEfforts}. */`,
+`,
   },
 ]
 

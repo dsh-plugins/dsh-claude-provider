@@ -53,6 +53,7 @@ const ADDED_SOURCES = [
   ['claude-types.ts', 'client/claude-types.ts'],
   ['claude-models.ts', 'client/claude-models.ts'],
   ['claude-adaptive-thinking.tsx', 'client/claude-adaptive-thinking.tsx'],
+  ['claude-empty-signature.tsx', 'client/claude-empty-signature.tsx'],
   ['../src/known-models.ts', 'client/known-models.ts'],
 ] as const
 
@@ -65,12 +66,10 @@ const ADDED_SOURCES = [
 async function linkKnownModels(stagingDir: string): Promise<void> {
   const tablePath = join(stagingDir, 'client', 'claude-types.ts')
   const constants = await readFile(tablePath, 'utf8')
-  const hostImport = "export { CLAUDE_KNOWN_MODELS } from '../src/known-models.ts'"
-  if (!constants.includes(hostImport)) throw new Error('build-client: recorded model import not found')
-  await writeFile(tablePath, constants.replace(
-    hostImport,
-    "export { CLAUDE_KNOWN_MODELS } from './known-models.ts'",
-  ))
+  const hostImport = "from '../src/known-models.ts'"
+  const occurrences = constants.split(hostImport).length - 1
+  if (occurrences === 0) throw new Error('build-client: recorded model import not found')
+  await writeFile(tablePath, constants.replaceAll(hostImport, "from './known-models.ts'"))
 }
 
 /**

@@ -22,13 +22,19 @@ This release targets DeepSeek Harness 0.2.2-rc.2 and 0.2.2-rc.3. Those versions 
 
    Adds an Adaptive thinking toggle for each model alongside DSH's existing reasoning-level settings. Reasoning levels and their corresponding API parameter values remain customizable.
 
-   For Anthropic-compatible models that support adaptive thinking. When enabled, the model adjusts its thinking based on task complexity and your selected reasoning level. When disabled, it uses the thinking token limit associated with that level.
+   For Anthropic-compatible models that support adaptive thinking. When enabled, the model adjusts its thinking based on task complexity and your selected reasoning level. When disabled, it uses the thinking token limit associated with that level. A model that always reasons keeps the toggle on and locked.
+
+   Each recorded Claude model carries its own reasoning levels and mode; a model ID outside the recorded table is classified by its family and version, and an ID naming no Claude family falls back to budget thinking. A route holding at least one budget-thinking model also records the thinking token budgets those models spend (1024 for low, 4096 for medium, 32000 for high).
 
    On save, the plugin writes each model's reasoning levels and adaptive thinking settings to DeepSeek Harness's native configuration.
 
 <p align="center">
   <img src="./docs/images/model-options.en.png" alt="Claude model capacity defaults and reasoning modes" width="580">
 </p>
+
+2b. **Accepts empty thinking signatures for gateways that need them**
+
+   Some Anthropic-compatible endpoints emit and accept a thinking block whose signature is empty. The **Accept empty thinking signatures** switch records that preference on the route, so such a block is replayed as thinking instead of being converted to plain text. It is off by default because the official Anthropic API rejects an empty signature.
 
 3. **Supports paginated Anthropic model discovery**
 

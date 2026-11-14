@@ -2,12 +2,12 @@
  * Claude-only model rules shared by the patched settings cards.
  *
  * The cards receive raw drafted rows, so these helpers answer three questions:
- * which reasoning levels a recorded Claude model offers, whether a row's
- * thinking is adaptive, and what an adopted or saved row must carry. Every
- * helper returns new objects and never mutates its input.
+ * which reasoning levels a Claude model offers, whether a row's thinking is
+ * adaptive, and what an adopted or saved row must carry. Every helper returns
+ * new objects and never mutates its input.
  */
-import { CLAUDE_KNOWN_MODELS } from './claude-types.ts'
-import type { ClaudeKnownModel } from './claude-types.ts'
+import { CLAUDE_KNOWN_MODELS, claudeThinkingProfile } from './claude-types.ts'
+import type { ClaudeThinkingLevel, ClaudeThinkingProfile } from './claude-types.ts'
 
 /** One model row as the settings page drafts it. */
 export interface ClaudeModel {
@@ -25,42 +25,67 @@ export interface ClaudeProfile {
   compat?: Record<string, unknown>
   models?: ClaudeModel[]
   reasoning?: string
+  thinkingBudgets?: Record<string, number>
   [key: string]: unknown
 }
 
-const CLAUDE_FIVE_EFFORTS = Object.freeze({ low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' })
-const CLAUDE_FOUR_EFFORTS = Object.freeze({ low: 'low', medium: 'medium', high: 'high', max: 'max' })
-const CLAUDE_TOGGLE_EFFORTS = Object.freeze({ off: null, high: 'high' })
+/**
+ * Token budgets a budget-thinking Claude model spends per level, matching the
+ * escalation kimi-code sends. Adaptive models read their level from
+ * `output_config.effort` instead and never consult these numbers.
+ */
+const CLAUDE_THINKING_BUDGETS: Readonly<Record<string, number>> = Object.freeze({
+  minimal: 1024,
+  low: 1024,
+  medium: 4096,
+  high: 32000,
+})
 
 /** Rows created by the add button that have no model id yet. */
 const PENDING_MODELS = new WeakSet<ClaudeModel>()
 
 /**
- * The reasoning levels a recorded preset declares.
- * @param preset - the model's recorded preset name.
+ * The reasoning levels one model declares.
+ *
+ * `off` is declared only for a model that accepts disabled thinking: an absent
+ * key is how the adapter reads "this model always reasons", while a `null`
+ * value is the Off entry that sends nothing.
+ * @param model - the model's id.
  * @returns a fresh level-to-wire-value map.
  */
-export function reasoningEffortsForPreset(preset: string): Record<string, unknown> {
-  if (preset === 'toggle') return { ...CLAUDE_TOGGLE_EFFORTS }
-  if (preset === 'four') return { ...CLAUDE_FOUR_EFFORTS }
-  return { ...CLAUDE_FIVE_EFFORTS }
+export function reasoningEffortsForModel(model: string): Record<string, unknown> {
+  const profile: ClaudeThinkingProfile = claudeThinkingProfile(model)
+  const efforts: Record<string, unknown> = profile.canDisable ? { off: null } : {}
+  for (const level of profile.efforts) efforts[level] = level
+  return efforts
 }
 
 /**
- * Whether one model sends adaptive thinking. A model the table records as a
- * toggle model never adapts; otherwise an explicit choice wins, then the
- * provider-wide inheritance, then the recorded preset.
+ * Whether one model sends adaptive thinking.
+ *
+ * A budget-thinking model never adapts: the flag has no meaning there, and
+ * sending `adaptive` to a model driven by `budget_tokens` is refused. For an
+ * adaptive model a row's explicit choice wins, then the provider-wide choice.
  * @param model - the drafted row.
  * @param inherited - the provider-wide `forceAdaptiveThinking` value, if any.
  * @returns whether the row should force adaptive thinking.
  */
 export function claudeAdaptiveEnabled(model: ClaudeModel, inherited?: unknown): boolean {
-  const known: ClaudeKnownModel | undefined = CLAUDE_KNOWN_MODELS[model.id]
-  if (known?.preset === 'toggle') return false
+  if (claudeThinkingProfile(model.id).mode === 'budget') return false
   const explicit = model.compat?.['forceAdaptiveThinking']
   if (typeof explicit === 'boolean') return explicit
   if (typeof inherited === 'boolean') return inherited
-  return known !== undefined
+  return true
+}
+
+/**
+ * Whether a model accepts disabled thinking, which is what makes the
+ * adaptive-thinking switch meaningful for it.
+ * @param model - the model's id.
+ * @returns whether the model can stop thinking.
+ */
+export function claudeCanDisableThinking(model: string): boolean {
+  return claudeThinkingProfile(model).canDisable
 }
 
 /**
@@ -76,17 +101,16 @@ export function withClaudeAdaptive(model: ClaudeModel, enabled: boolean): Claude
 /**
  * Fill a row's thinking defaults when it is adopted, never when it is saved.
  * @param model - the drafted row.
- * @returns the row with recorded reasoning levels and an adaptive default.
+ * @returns the row with its reasoning levels and an adaptive default.
  */
 export function withDefaultClaudeReasoning(model: ClaudeModel): ClaudeModel {
-  const known = CLAUDE_KNOWN_MODELS[model.id]
   const next: ClaudeModel = Object.hasOwn(model, 'reasoningEfforts') ? { ...model } : {
     ...model,
-    reasoningEfforts: reasoningEffortsForPreset(known?.preset ?? 'five'),
+    reasoningEfforts: reasoningEffortsForModel(model.id),
   }
   return typeof next.compat?.['forceAdaptiveThinking'] === 'boolean'
     ? next
-    : withClaudeAdaptive(next, known?.preset !== 'toggle')
+    : withClaudeAdaptive(next, claudeAdaptiveEnabled(next))
 }
 
 /**
@@ -114,6 +138,21 @@ export function withFetchedClaudeMetadata(model: ClaudeModel): ClaudeModel {
       maxTokens: model.maxTokens ?? known.maxTokens,
     },
   }))
+}
+
+/**
+ * The thinking budgets a route needs: a route holding at least one
+ * budget-thinking model declares the level-to-token map those models spend,
+ * while an all-adaptive route declares nothing because it never reads them.
+ * @param models - the route's drafted rows.
+ * @returns the budget map, or `undefined` when no model uses budget thinking.
+ */
+export function claudeRouteThinkingBudgets(
+  models: readonly ClaudeModel[],
+): Readonly<Record<string, number>> | undefined {
+  return models.some(model => claudeThinkingProfile(model.id).mode === 'budget')
+    ? CLAUDE_THINKING_BUDGETS
+    : undefined
 }
 
 /**
@@ -161,8 +200,8 @@ export function withNativeClaudeModel(model: ClaudeModel, inherited?: unknown): 
 
 /**
  * Fold a saved provider profile into the native Claude shape: the provider-wide
- * flag moves onto each model, and a default level the edited models no longer
- * offer is dropped.
+ * flag moves onto each model, the route declares the budgets its models spend,
+ * and a default level the edited models no longer offer is dropped.
  * @param profile - the profile as the card holds it.
  * @returns the replacement profile.
  */
@@ -174,10 +213,12 @@ export function withNativeClaudeProfile(profile: ClaudeProfile): ClaudeProfile {
   const models = Array.isArray(profile.models)
     ? profile.models.map(model => withNativeClaudeModel(model, inherited))
     : profile.models
+  const budgets = Array.isArray(models) ? claudeRouteThinkingBudgets(models) : undefined
   const next: ClaudeProfile = {
     ...rest,
     ...Object.keys(compat).length ? { compat } : {},
     ...models === undefined ? {} : { models },
+    ...budgets === undefined ? {} : { thinkingBudgets: { ...budgets } },
   }
   if (typeof next.reasoning === 'string' && Array.isArray(models)
       && models.some(model => !Object.hasOwn(model.reasoningEfforts ?? {}, next.reasoning as string))) {
