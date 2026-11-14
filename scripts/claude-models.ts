@@ -9,9 +9,9 @@
 import { CLAUDE_KNOWN_MODELS, claudeThinkingProfile } from './claude-types.ts'
 import type { ClaudeThinkingLevel, ClaudeThinkingProfile } from './claude-types.ts'
 
-/** One model row as the settings page drafts it. */
+/** 设置页的开放草稿，模型 ID 在输入和校验完成前可以缺失。 */
 export interface ClaudeModel {
-  id: string
+  id?: unknown
   input?: string[]
   contextWindow?: number
   maxTokens?: number
@@ -53,8 +53,8 @@ const PENDING_MODELS = new WeakSet<ClaudeModel>()
  * @param model - the model's id.
  * @returns a fresh level-to-wire-value map.
  */
-export function reasoningEffortsForModel(model: string): Record<string, unknown> {
-  const profile: ClaudeThinkingProfile = claudeThinkingProfile(model)
+export function reasoningEffortsForModel(model: unknown): Record<string, unknown> {
+  const profile: ClaudeThinkingProfile = claudeThinkingProfile(typeof model === 'string' ? model : '')
   const efforts: Record<string, unknown> = profile.canDisable ? { off: null } : {}
   for (const level of profile.efforts) efforts[level] = level
   return efforts
@@ -71,7 +71,7 @@ export function reasoningEffortsForModel(model: string): Record<string, unknown>
  * @returns whether the row should force adaptive thinking.
  */
 export function claudeAdaptiveEnabled(model: ClaudeModel, inherited?: unknown): boolean {
-  if (claudeThinkingProfile(model.id).mode === 'budget') return false
+  if (claudeThinkingProfile(typeof model.id === 'string' ? model.id : '').mode === 'budget') return false
   const explicit = model.compat?.['forceAdaptiveThinking']
   if (typeof explicit === 'boolean') return explicit
   if (typeof inherited === 'boolean') return inherited
@@ -84,8 +84,8 @@ export function claudeAdaptiveEnabled(model: ClaudeModel, inherited?: unknown): 
  * @param model - the model's id.
  * @returns whether the model can stop thinking.
  */
-export function claudeCanDisableThinking(model: string): boolean {
-  return claudeThinkingProfile(model).canDisable
+export function claudeCanDisableThinking(model: unknown): boolean {
+  return claudeThinkingProfile(typeof model === 'string' ? model : '').canDisable
 }
 
 /**
@@ -120,7 +120,9 @@ export function withDefaultClaudeReasoning(model: ClaudeModel): ClaudeModel {
  * @returns the replacement row.
  */
 export function withKnownClaudeInput(model: ClaudeModel): ClaudeModel {
-  if (CLAUDE_KNOWN_MODELS[model.id] === undefined || Array.isArray(model.input)) return { ...model }
+  if (typeof model.id !== 'string' || CLAUDE_KNOWN_MODELS[model.id] === undefined || Array.isArray(model.input)) {
+    return { ...model }
+  }
   return { ...model, input: ['text', 'image'] }
 }
 
@@ -130,7 +132,7 @@ export function withKnownClaudeInput(model: ClaudeModel): ClaudeModel {
  * @returns the row with capacities, input types and reasoning defaults.
  */
 export function withFetchedClaudeMetadata(model: ClaudeModel): ClaudeModel {
-  const known = CLAUDE_KNOWN_MODELS[model.id]
+  const known = typeof model.id === 'string' ? CLAUDE_KNOWN_MODELS[model.id] : undefined
   return withDefaultClaudeReasoning(withKnownClaudeInput({
     ...model,
     ...known === undefined ? {} : {
@@ -150,7 +152,7 @@ export function withFetchedClaudeMetadata(model: ClaudeModel): ClaudeModel {
 export function claudeRouteThinkingBudgets(
   models: readonly ClaudeModel[],
 ): Readonly<Record<string, number>> | undefined {
-  return models.some(model => claudeThinkingProfile(model.id).mode === 'budget')
+  return models.some(model => claudeThinkingProfile(typeof model.id === 'string' ? model.id : '').mode === 'budget')
     ? CLAUDE_THINKING_BUDGETS
     : undefined
 }
@@ -182,7 +184,7 @@ export function carryClaudeDraft(model: ClaudeModel, next: ClaudeModel): ClaudeM
  * @returns the row with its defaults filled, or the row itself while unnamed.
  */
 export function finishClaudeDraft(model: ClaudeModel): ClaudeModel {
-  return PENDING_MODELS.has(model) && model.id.trim().length > 0
+  return PENDING_MODELS.has(model) && typeof model.id === 'string' && model.id.trim().length > 0
     ? withFetchedClaudeMetadata(model)
     : model
 }

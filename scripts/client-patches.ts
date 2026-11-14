@@ -152,28 +152,6 @@ export const PATCHES: readonly Patch[] = [
     after: `${terminator}\n${claudeCopyLines(locale)}`,
   })),
 
-  // ---- index: expose the marker namespace to the section ----
-  {
-    file: 'client/index.ts',
-    label: 'Claude marker namespace descriptor',
-    before: '  const controller = new ModelsSettingsStore(ctx, schema, ctx.configForms.describe())',
-    after: `  const controller = new ModelsSettingsStore(ctx, schema, ctx.configForms.describe())
-  // The Claude markers live in this plugin's own settings namespace, so the
-  // page offers the Claude tab only once that namespace resolves.
-  const providerTypeState = ${JSON.stringify(SETTINGS_NS)}`,
-  },
-  {
-    file: 'client/index.ts',
-    label: 'Claude section injected face',
-    before: `  const injected = (): ModelsSectionInjected => ({
-    controller,
-    hooks: { snapshot: controller.store },`,
-    after: `  const injected = (): ModelsSectionInjected => ({
-    controller,
-    providerTypeState,
-    hooks: { snapshot: controller.store },`,
-  },
-
   // ---- store: name the marker namespace once ----
   {
     file: 'client/store.ts',
@@ -201,15 +179,9 @@ import { CLAUDE_PROVIDER_TYPE } from './claude-types.ts'`,
   },
   {
     file: 'client/ModelsSection.tsx',
-    label: 'Claude section injected face',
-    before: `export interface ModelsSectionInjected {
-  /** The page store (loaded on mount, refreshed on pushed invalidations). */
-  controller: ModelsSettingsStore`,
-    after: `export interface ModelsSectionInjected {
-  /** The page store (loaded on mount, refreshed on pushed invalidations). */
-  controller: ModelsSettingsStore
-  /** Settings namespace holding the provider ids this plugin renders as Claude. */
-  providerTypeState: string`,
+    label: 'Claude editor render props',
+    before: "  'namespace' | 'schema' | 'operations' | 't' | 'readOnly' | 'onClose'",
+    after: "  'namespace' | 'schema' | 'operations' | 't' | 'readOnly' | 'onClose' | 'thinkingPresets'",
   },
   {
     file: 'client/ModelsSection.tsx',
@@ -247,7 +219,7 @@ import { CLAUDE_PROVIDER_TYPE } from './claude-types.ts'`,
     label: 'Claude row fact',
     before: '          const open = !addOpen && editing?.provider === row.entry.provider\n          const credentialConfigured = row.credential?.configured === true',
     after: `          const open = !addOpen && editing?.provider === row.entry.provider
-          const adaptiveClaude = isClaudeProvider(row, state.namespaces, providerTypeState)
+          const adaptiveClaude = isClaudeProvider(row, state.namespaces)
           const credentialConfigured = row.credential?.configured === true`,
   },
   {
@@ -273,7 +245,7 @@ import { CLAUDE_PROVIDER_TYPE } from './claude-types.ts'`,
     after: `              {renderProviderEditor({
                   target,
                   row,
-                  thinkingPresets: isClaudeProvider(row, state.namespaces, providerTypeState),
+                  thinkingPresets: isClaudeProvider(row, state.namespaces),
                   namespace,`,
   },
   {
@@ -286,7 +258,7 @@ import { CLAUDE_PROVIDER_TYPE } from './claude-types.ts'`,
     after: `                ? renderProviderEditor({
                   target,
                   row,
-                  thinkingPresets: isClaudeProvider(row, state.namespaces, providerTypeState),
+                  thinkingPresets: isClaudeProvider(row, state.namespaces),
                   namespace,`,
   },
   {
@@ -294,18 +266,16 @@ import { CLAUDE_PROVIDER_TYPE } from './claude-types.ts'`,
     label: 'Claude type helper',
     before: 'function renderProviderEditor({ target, row, ...props }: ProviderEditorRenderProps): ReactNode {',
     after: `/**
- * Whether one provider row carries this plugin's Claude marker.
- * @param row - the joined provider row.
- * @param namespaces - the page snapshot's settings namespaces.
- * @param providerTypeState - namespace the Claude markers are stored in.
- * @returns whether the row renders the dedicated Claude form.
+ * 根据插件自己的类型标记选择 Claude 专用编辑器。
+ * @param row - 页面合并后的提供方。
+ * @param namespaces - 当前页面快照的设置命名空间。
+ * @returns 该提供方是否带有 Claude 类型标记。
  */
 function isClaudeProvider(
   row: ProviderRow,
   namespaces: ReadonlyMap<string, SettingsNamespaceView>,
-  providerTypeState: string,
 ): boolean {
-  const markers = namespaces.get(providerTypeState)?.value
+  const markers = namespaces.get(CLAUDE_MARKER_NS)?.value
   const types = (markers as { providerTypes?: Record<string, string> } | undefined)?.providerTypes
   return types?.[row.entry.provider] === CLAUDE_PROVIDER_TYPE
 }
@@ -632,6 +602,26 @@ import { carryClaudeDraft, finishClaudeDraft, newClaudeModel, withFetchedClaudeM
                 onChange(models.map((row, at) => at === index ? next : row))
               }
               : undefined}`,
+  },
+  {
+    file: 'client/ModelListEditor.tsx',
+    label: 'Claude pending field edits',
+    before: `      return Object.fromEntries(
+        Object.entries({ ...model, ...next }).filter(([key]) => !cleared.has(key)),
+      )`,
+    after: `      const updated = Object.fromEntries(
+        Object.entries({ ...model, ...next }).filter(([key]) => !cleared.has(key)),
+      )
+      return props.thinkingPresets === true ? carryClaudeDraft(model, updated) : updated`,
+  },
+  {
+    file: 'client/ModelListEditor.tsx',
+    label: 'Claude pending row edits',
+    before: '            onChange={(next) => { onChange(models.map((row, at) => at === index ? next : row)) }}',
+    after: `            onChange={(next) => {
+              const updated = props.thinkingPresets === true ? carryClaudeDraft(model, next) : next
+              onChange(models.map((row, at) => at === index ? updated : row))
+            }}`,
   },
   {
     file: 'client/ModelListEditor.tsx',

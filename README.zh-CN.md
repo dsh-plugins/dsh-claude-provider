@@ -73,7 +73,9 @@ mkdir -p dist
 npm pack --pack-destination dist
 ```
 
-构建会用 `tsc` 编译宿主半区，并从已安装的 `@deepseek-ai/dsh-client-ui-settings-models` 源码生成浏览器半区，因此 `devDependencies` 中的 DSH 版本决定客户端半区适配的设置页。`npm run typecheck` 与 `npm test` 会分别校验两个半区。
+构建会用 `tsc` 编译宿主半区，并从已安装的 `@deepseek-ai/dsh-client-ui-settings-models` 源码生成浏览器半区，因此 `devDependencies` 中的 DSH 版本决定客户端半区适配的设置页。`npm run typecheck` 会重新暂存上游源码、应用补丁，并对实际页面、Claude 控件和辅助规则执行类型检查；`npm run build` 也会在打包前执行这项检查，并与检查器共用 `react-jsx` 配置，从宿主加载 `react/jsx-runtime`，不依赖全局 `React`。`npm test` 验证模型规则与配置解析。
+
+如果「设置 → 模型」完全空白，先检查安装的包名与版本。旧作用域包 `@mofeng2223/dsh-claude-provider@0.6.6` 声明适配 DSH `0.2.2-rc.1`；本仓库使用 `@dsh-plugin/dsh-claude-provider`，两者是不同的 npm 包，安装新包不会自动移除旧包。切换时须先移除旧包，再安装与宿主匹配的新包并重启，避免两个插件同时替换模型页面。
 
 将生成的包安装到 Web Profile：
 

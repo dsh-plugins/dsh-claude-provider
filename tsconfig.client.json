@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "rootDir": ".",
+    "noEmit": true,
+    "declaration": false,
+    "jsx": "react-jsx",
+    "types": ["react"]
+  },
+  "include": [".client-build/client/index.ts", "scripts/client-env.d.ts"]
+}

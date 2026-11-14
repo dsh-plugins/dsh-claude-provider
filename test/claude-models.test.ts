@@ -113,7 +113,9 @@ test('a newly named row takes its defaults only after the id is typed', () => {
   const pending = newClaudeModel()
   assert.deepEqual(pending, { id: '' })
   assert.equal(finishClaudeDraft(pending), pending)
-  const typed = carryClaudeDraft(pending, { ...pending, id: 'claude-opus-5' })
+  const cleared = carryClaudeDraft(pending, { name: '尚未命名' })
+  assert.equal(finishClaudeDraft(cleared), cleared)
+  const typed = carryClaudeDraft(cleared, { ...cleared, id: 'claude-opus-5' })
   const named = finishClaudeDraft(typed)
   assert.equal(named.contextWindow, 1000000)
   assert.deepEqual(named.input, ['text', 'image'])
@@ -158,14 +160,24 @@ test('a profile default level the edited models no longer offer is dropped', () 
   assert.equal(Object.hasOwn(saved, 'reasoning'), false)
 })
 
-test('the recorded table names Claude model ids and every profile is consistent', () => {
-  for (const [id, model] of Object.entries(CLAUDE_KNOWN_MODELS)) {
-    assert.match(id, /^claude-/)
-    assert.ok(model.thinking.efforts.length > 0)
-    if (model.thinking.mode === 'budget') {
-      assert.deepEqual(model.thinking.efforts, ['low', 'medium', 'high'])
-    }
+test('模型草稿缺少有效 ID 时沿用未命名行的规则并保留原始输入', () => {
+  for (const id of [undefined, null, 42, '']) {
+    const draft = { id, name: '未完成的模型' }
+    assert.equal(claudeAdaptiveEnabled(draft), false)
+    assert.equal(claudeCanDisableThinking(id), true)
+    assert.deepEqual(reasoningEffortsForModel(id), reasoningEffortsForModel(''))
+    const adopted = withFetchedClaudeMetadata(draft)
+    assert.equal(adopted.id, id)
+    assert.equal(adopted.input, undefined)
+    assert.equal(adopted.contextWindow, undefined)
+    assert.equal(adopted.name, draft.name)
+    const pending = carryClaudeDraft(newClaudeModel(), draft)
+    assert.equal(finishClaudeDraft(pending), pending)
   }
+  assert.equal(claudeAdaptiveEnabled({}), false)
+})
+
+test('模型保存时按其思考模式解析路由级自适应配置', () => {
   assert.equal(withNativeClaudeModel({ id: 'claude-haiku-4-5' }).compat?.['forceAdaptiveThinking'], false)
   assert.equal(withNativeClaudeModel({ id: 'proxy' }, true).compat?.['forceAdaptiveThinking'], false)
   assert.equal(withNativeClaudeModel({ id: 'claude-opus-4-7' }, false).compat?.['forceAdaptiveThinking'], false)

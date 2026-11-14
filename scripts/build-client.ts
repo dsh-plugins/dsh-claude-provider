@@ -9,6 +9,7 @@
  * the DSH web shell serves. Patching sources rather than the published bundle
  * keeps every edit readable, type-checked, and attributable to one anchor.
  */
+import { spawnSync } from 'node:child_process'
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join, relative, sep } from 'node:path'
@@ -119,8 +120,24 @@ async function build(): Promise<void> {
   await linkKnownModels(stagingDir)
 
   const patched = await applyClientPatches(stagingDir)
+  const checked = spawnSync(process.execPath, [
+    require.resolve('typescript/bin/tsc'),
+    '--project', join(here, '../tsconfig.client.json'),
+  ], { stdio: 'inherit' })
+  if (checked.error !== undefined) {
+    throw new Error('build-client: 无法启动客户端类型检查', { cause: checked.error })
+  }
+  if (checked.status !== 0) {
+    throw new Error(`build-client: 客户端类型检查失败，退出码 ${checked.status}，信号 ${checked.signal}`)
+  }
+  if (process.argv.includes('--check')) {
+    process.stderr.write(`build-client: checked ${patched.patches} anchors across ${patched.files} files\n`)
+    return
+  }
   const result = await esbuild.build({
     entryPoints: [join(stagingDir, 'client', 'index.ts')],
+    // 共用 JSX 配置，避免打包器生成页面未导入的全局 React 引用。
+    tsconfig: join(here, '../tsconfig.client.json'),
     bundle: true,
     write: false,
     format: 'cjs',
