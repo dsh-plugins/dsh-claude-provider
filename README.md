@@ -36,6 +36,20 @@ This release targets DeepSeek Harness 0.2.2-rc.2 and 0.2.2-rc.3. Those versions 
 
    Some Anthropic-compatible endpoints emit and accept a thinking block whose signature is empty. The **Accept empty thinking signatures** switch records that preference on the route, so such a block is replayed as thinking instead of being converted to plain text. It is off by default because the official Anthropic API rejects an empty signature.
 
+2c. **Configures prompt-cache lifetimes per section**
+
+   The Claude form gains a **Prompt cache lifetime** select: provider default, off (no cache), five minutes, or one hour. Provider default writes nothing and leaves the choice to the adapter, which normally means five minutes; off records `cacheRetention: none`, so the route emits no cache breakpoints at all; the two durations record their own value, and an hour still needs an adapter that allows the long lifetime.
+
+   After choosing one hour, open the **Claude provider** entry on the **Plugins** page and expand the **Claude prompt cache** card to give tools, system prompt, and messages their own five-minute or one-hour lifetime. The Anthropic API requires every one-hour breakpoint to precede the five-minute ones, so the plugin validates the combination: when it is one the API would refuse, the card says so and names the reason, and the affected requests keep the provider's own lifetimes instead of being sent.
+
+   One-hour cache writes cost 2× base input, so they only pay off for prefixes reused across turns. The defaults therefore give tools and the system prompt an hour and keep messages on five minutes.
+
+   The bottom of the card is the pre-warm panel: name a provider, press **Pre-warm cache**, and the plugin replays that provider's last request with `max_tokens: 0`, writing the tools and system prompt into the cache so the first turn starts warmer. Pre-warming spends a cache write, and its breakpoint must land on tools or the system prompt to help later requests. A provider that has not sent a request in this process has no shape to replay and is reported as such.
+
+   Two kinds of request cannot be replayed with a zero output budget, and the plugin explains why instead of sending them: budget thinking, whose `budget_tokens` is constrained against `max_tokens`, so lowering the cap either breaks that constraint or writes an entry no real request matches, and a request carrying structured-output configuration, which the adapter does not emit today and which is checked defensively. Adaptive thinking and `output_config.effort` are copied verbatim because they are rendered into the prompt, and changing them would key the entry differently.
+
+   Mixed lifetimes and pre-warming need `@dsh-plugin/dsh-loader`. A profile without it keeps the plugin's original behavior: routes still carry `cacheRetention`, and request bodies are left untouched.
+
 3. **Supports paginated Anthropic model discovery**
 
    The plugin fetches model lists through an Anthropic-compatible `GET /v1/models` endpoint, follows the returned cursors to retrieve subsequent pages, and deduplicates the results.

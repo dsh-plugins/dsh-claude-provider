@@ -44,6 +44,13 @@ const CLAUDE_COPY: Readonly<Record<string, Readonly<Record<string, string>>>> = 
     claudeEmptySignature: 'Accept empty thinking signatures',
     claudeEmptySignatureHelpLabel: 'Empty thinking signature help',
     claudeEmptySignatureHelp: 'For Anthropic-compatible endpoints that emit and accept thinking blocks carrying an empty signature. When enabled, such a block is replayed as a thinking block instead of being converted to text. Leave it off for the official Anthropic API, which rejects an empty signature.',
+    claudeCacheMode: 'Prompt cache lifetime',
+    claudeCacheModeHelpLabel: 'Prompt cache lifetime help',
+    claudeCacheModeHelp: 'The lifetime this route asks the endpoint for. Provider default sends no lifetime and leaves the choice to the adapter. When this plugin’s settings page has per-section durations enabled, a route set to one hour splits its request there: an hour for tools and the system prompt, five minutes for the conversation. One-hour writes cost twice the base input price.',
+    claudeCacheProvider: 'Provider default (usually five minutes)',
+    claudeCacheOff: 'Off (no cache)',
+    claudeCacheShort: 'Five minutes',
+    claudeCacheLong: 'One hour',
   },
   zh: {
     claudeTab: 'Claude 提供商',
@@ -54,6 +61,13 @@ const CLAUDE_COPY: Readonly<Record<string, Readonly<Record<string, string>>>> = 
     claudeEmptySignature: '接受空思考签名',
     claudeEmptySignatureHelpLabel: '空思考签名说明',
     claudeEmptySignatureHelp: '适用于会发出并接受空签名思考块的 Anthropic 兼容端点。开启后，这类块按思考块回传，而不是被转换成正文。官方 Anthropic API 会拒绝空签名，请保持关闭。',
+    claudeCacheMode: '提示缓存时长',
+    claudeCacheModeHelpLabel: '提示缓存时长说明',
+    claudeCacheModeHelp: '这条路由向端点声明的缓存存活时间。选择提供商默认时不声明时长，由适配器决定。当插件配置页启用分段时长后，设为一小时的路由会在那里被拆分：工具与系统提示按一小时缓存，对话按五分钟缓存。一小时写入按基础输入价的 2 倍计费。',
+    claudeCacheProvider: '提供商默认（通常为五分钟）',
+    claudeCacheOff: '关闭（不启用缓存）',
+    claudeCacheShort: '五分钟',
+    claudeCacheLong: '一小时',
   },
   ja: {
     claudeTab: 'Claudeプロバイダー',
@@ -64,6 +78,13 @@ const CLAUDE_COPY: Readonly<Record<string, Readonly<Record<string, string>>>> = 
     claudeEmptySignature: '空の思考署名を許可',
     claudeEmptySignatureHelpLabel: '空の思考署名の説明',
     claudeEmptySignatureHelp: '空の署名を持つ思考ブロックを送信・受理するAnthropic互換エンドポイント向けです。有効にすると、そのブロックは本文に変換されず思考ブロックとして再送されます。公式Anthropic APIは空の署名を拒否するため、無効のままにしてください。',
+    claudeCacheMode: 'プロンプトキャッシュの保持時間',
+    claudeCacheModeHelpLabel: 'プロンプトキャッシュの保持時間の説明',
+    claudeCacheModeHelp: 'このルートがエンドポイントに指定する保持時間です。プロバイダーの既定値を選ぶと時間を指定せず、アダプターの判断に委ねます。プラグイン設定ページで区間ごとの保持時間を有効にすると、1時間を選んだルートはそこで分割されます。ツールとシステムプロンプトは1時間、会話は5分です。1時間の書き込みは基本入力価格の2倍です。',
+    claudeCacheProvider: 'プロバイダーの既定値（通常5分）',
+    claudeCacheOff: 'オフ（キャッシュなし）',
+    claudeCacheShort: '5分',
+    claudeCacheLong: '1時間',
   },
   es: {
     claudeTab: 'Proveedor Claude',
@@ -74,6 +95,13 @@ const CLAUDE_COPY: Readonly<Record<string, Readonly<Record<string, string>>>> = 
     claudeEmptySignature: 'Aceptar firmas de pensamiento vacías',
     claudeEmptySignatureHelpLabel: 'Ayuda sobre las firmas de pensamiento vacías',
     claudeEmptySignatureHelp: 'Para puntos finales compatibles con Anthropic que emiten y aceptan bloques de pensamiento con firma vacía. Al activarlo, ese bloque se reenvía como bloque de pensamiento en lugar de convertirse en texto. Déjelo desactivado para la API oficial de Anthropic, que rechaza una firma vacía.',
+    claudeCacheMode: 'Duración de la caché de prompt',
+    claudeCacheModeHelpLabel: 'Ayuda sobre la duración de la caché de prompt',
+    claudeCacheModeHelp: 'La duración que esta ruta pide al punto final. Con el valor del proveedor no se envía duración y la decide el adaptador. Cuando la página de configuración del plugin habilita duraciones por sección, una ruta fijada en una hora se divide allí: una hora para las herramientas y el mensaje de sistema, cinco minutos para la conversación. Las escrituras de una hora cuestan el doble del precio base de entrada.',
+    claudeCacheProvider: 'Valor del proveedor (normalmente cinco minutos)',
+    claudeCacheOff: 'Desactivada (sin caché)',
+    claudeCacheShort: 'Cinco minutos',
+    claudeCacheLong: 'Una hora',
   },
   fr: {
     claudeTab: 'Fournisseur Claude',
@@ -84,6 +112,13 @@ const CLAUDE_COPY: Readonly<Record<string, Readonly<Record<string, string>>>> = 
     claudeEmptySignature: 'Accepter les signatures de réflexion vides',
     claudeEmptySignatureHelpLabel: 'Aide sur les signatures de réflexion vides',
     claudeEmptySignatureHelp: 'Pour les points de terminaison compatibles Anthropic qui émettent et acceptent des blocs de réflexion à signature vide. Une fois activé, un tel bloc est renvoyé comme bloc de réflexion au lieu d\'être converti en texte. Laissez cette option désactivée pour l\'API Anthropic officielle, qui refuse une signature vide.',
+    claudeCacheMode: 'Durée du cache de prompt',
+    claudeCacheModeHelpLabel: 'Aide sur la durée du cache de prompt',
+    claudeCacheModeHelp: 'La durée que cette route demande au point de terminaison. La valeur du fournisseur n’envoie aucune durée et laisse l’adaptateur décider. Quand la page de configuration du plugin active les durées par section, une route réglée sur une heure y est découpée : une heure pour les outils et le message système, cinq minutes pour la conversation. Les écritures d\'une heure coûtent le double du prix d\'entrée de base.',
+    claudeCacheProvider: 'Valeur du fournisseur (généralement cinq minutes)',
+    claudeCacheOff: 'Désactivée (sans cache)',
+    claudeCacheShort: 'Cinq minutes',
+    claudeCacheLong: 'Une heure',
   },
   de: {
     claudeTab: 'Claude-Anbieter',
@@ -94,6 +129,13 @@ const CLAUDE_COPY: Readonly<Record<string, Readonly<Record<string, string>>>> = 
     claudeEmptySignature: 'Leere Denk-Signaturen akzeptieren',
     claudeEmptySignatureHelpLabel: 'Hilfe zu leeren Denk-Signaturen',
     claudeEmptySignatureHelp: 'Für Anthropic-kompatible Endpunkte, die Denkblöcke mit leerer Signatur senden und akzeptieren. Aktiviert wird ein solcher Block als Denkblock zurückgesendet, statt in Text umgewandelt zu werden. Lassen Sie die Option für die offizielle Anthropic-API deaktiviert, die eine leere Signatur ablehnt.',
+    claudeCacheMode: 'Lebensdauer des Prompt-Cache',
+    claudeCacheModeHelpLabel: 'Hilfe zur Lebensdauer des Prompt-Cache',
+    claudeCacheModeHelp: 'Die Lebensdauer, die diese Route vom Endpunkt anfordert. Die Anbietervorgabe sendet keine Lebensdauer und überlässt die Wahl dem Adapter. Wenn die Einstellungsseite des Plugins Abschnittsdauern aktiviert, wird eine auf eine Stunde gesetzte Route dort aufgeteilt: eine Stunde für Werkzeuge und Systemanweisung, fünf Minuten für die Unterhaltung. Ein-Stunden-Schreibvorgänge kosten das Doppelte des Basis-Eingabepreises.',
+    claudeCacheProvider: 'Anbietervorgabe (meist fünf Minuten)',
+    claudeCacheOff: 'Aus (kein Cache)',
+    claudeCacheShort: 'Fünf Minuten',
+    claudeCacheLong: 'Eine Stunde',
   },
   ru: {
     claudeTab: 'Провайдер Claude',
@@ -104,6 +146,13 @@ const CLAUDE_COPY: Readonly<Record<string, Readonly<Record<string, string>>>> = 
     claudeEmptySignature: 'Принимать пустые подписи мышления',
     claudeEmptySignatureHelpLabel: 'Справка о пустых подписях мышления',
     claudeEmptySignatureHelp: 'Для Anthropic-совместимых эндпоинтов, которые отправляют и принимают блоки мышления с пустой подписью. Когда включено, такой блок возвращается как блок мышления, а не преобразуется в текст. Для официального API Anthropic оставьте параметр выключенным: он отклоняет пустую подпись.',
+    claudeCacheMode: 'Срок хранения кэша запроса',
+    claudeCacheModeHelpLabel: 'Справка о сроке хранения кэша запроса',
+    claudeCacheModeHelp: 'Срок, который этот маршрут запрашивает у эндпоинта. Значение провайдера не передаёт срок и оставляет выбор адаптеру. Если на странице настроек плагина включены сроки по разделам, маршрут с часом делится там: час для инструментов и системного сообщения, пять минут для диалога. Записи на час стоят вдвое дороже базовой цены ввода.',
+    claudeCacheProvider: 'Значение провайдера (обычно пять минут)',
+    claudeCacheOff: 'Выключено (без кэша)',
+    claudeCacheShort: 'Пять минут',
+    claudeCacheLong: 'Один час',
   },
   pt: {
     claudeTab: 'Provedor Claude',
@@ -114,6 +163,13 @@ const CLAUDE_COPY: Readonly<Record<string, Readonly<Record<string, string>>>> = 
     claudeEmptySignature: 'Aceitar assinaturas de pensamento vazias',
     claudeEmptySignatureHelpLabel: 'Ajuda sobre assinaturas de pensamento vazias',
     claudeEmptySignatureHelp: 'Para endpoints compatíveis com Anthropic que emitem e aceitam blocos de pensamento com assinatura vazia. Quando ativado, esse bloco é reenviado como bloco de pensamento em vez de ser convertido em texto. Mantenha desativado para a API oficial da Anthropic, que recusa uma assinatura vazia.',
+    claudeCacheMode: 'Duração do cache de prompt',
+    claudeCacheModeHelpLabel: 'Ajuda sobre a duração do cache de prompt',
+    claudeCacheModeHelp: 'A duração que esta rota pede ao endpoint. O valor do provedor não envia duração e deixa a escolha ao adaptador. Quando a página de configuração do plugin habilita durações por seção, uma rota definida em uma hora é dividida ali: uma hora para as ferramentas e o sistema, cinco minutos para a conversa. Escritas de uma hora custam o dobro do preço base de entrada.',
+    claudeCacheProvider: 'Valor do provedor (normalmente cinco minutos)',
+    claudeCacheOff: 'Desativado (sem cache)',
+    claudeCacheShort: 'Cinco minutos',
+    claudeCacheLong: 'Uma hora',
   },
 }
 
@@ -353,7 +409,9 @@ function renderProviderEditor({ target, row, ...props }: ProviderEditorRenderPro
     after: `import { protocolNeedsKey, protocolReasoningLevels } from './protocol-rules.ts'
 import { CLAUDE_DISCOVERY_API, CLAUDE_PROVIDER_SETTINGS_NS, CLAUDE_PROVIDER_TYPE } from './claude-types.ts'
 import { withNativeClaudeModel, withNativeClaudeProfile } from './claude-models.ts'
-import { ClaudeEmptySignature } from './claude-empty-signature.tsx'`,
+import { ClaudeEmptySignature } from './claude-empty-signature.tsx'
+import { ClaudeCacheMode } from './claude-cache-mode.tsx'
+import type { ClaudeCacheChoice } from './claude-cache-mode.tsx'`,
   },
   {
     file: 'client/CustomProviderCard.tsx',
@@ -374,7 +432,8 @@ import { ClaudeEmptySignature } from './claude-empty-signature.tsx'`,
     before: "  const [protocol, setProtocol] = useState(protocols[0] ?? '')",
     after: `  const isAdaptiveClaude = props.providerType === CLAUDE_PROVIDER_TYPE
   const [protocol, setProtocol] = useState(isAdaptiveClaude ? 'anthropic-messages' : protocols[0] ?? '')
-  const [emptySignature, setEmptySignature] = useState(false)`,
+  const [emptySignature, setEmptySignature] = useState(false)
+  const [cacheChoice, setCacheChoice] = useState<ClaudeCacheChoice | undefined>(undefined)`,
   },
   {
     file: 'client/CustomProviderCard.tsx',
@@ -384,7 +443,8 @@ import { ClaudeEmptySignature } from './claude-empty-signature.tsx'`,
         baseURL: normalizedBaseURL,
         models: models.map(model => isAdaptiveClaude ? withNativeClaudeModel(model) : { ...model }),
         ...isAdaptiveClaude ? { reasoning: 'high' } : {},
-        ...isAdaptiveClaude && emptySignature ? { compat: { allowEmptySignature: true } } : {},`,
+        ...isAdaptiveClaude && emptySignature ? { compat: { allowEmptySignature: true } } : {},
+        ...isAdaptiveClaude && cacheChoice !== undefined ? { cacheRetention: cacheChoice } : {},`,
   },
   {
     file: 'client/CustomProviderCard.tsx',
@@ -445,12 +505,20 @@ import { ClaudeEmptySignature } from './claude-empty-signature.tsx'`,
       />
       {isAdaptiveClaude
         ? (
-          <ClaudeEmptySignature
-            checked={emptySignature}
-            disabled={profileDisabled}
-            t={t}
-            onChange={setEmptySignature}
-          />
+          <>
+            <ClaudeCacheMode
+              value={cacheChoice}
+              disabled={profileDisabled}
+              t={t}
+              onChange={setCacheChoice}
+            />
+            <ClaudeEmptySignature
+              checked={emptySignature}
+              disabled={profileDisabled}
+              t={t}
+              onChange={setEmptySignature}
+            />
+          </>
         )
         : null}
 `,
@@ -476,7 +544,8 @@ import { ClaudeEmptySignature } from './claude-empty-signature.tsx'`,
     after: `import { RetryPolicyEditor, retryPolicyDefaults, retryPolicyFailure } from './RetryPolicyEditor.tsx'
 import { CLAUDE_DISCOVERY_API, CLAUDE_PROVIDER_TYPE } from './claude-types.ts'
 import { withNativeClaudeProfile } from './claude-models.ts'
-import { ClaudeEmptySignature } from './claude-empty-signature.tsx'`,
+import { ClaudeEmptySignature } from './claude-empty-signature.tsx'
+import { ClaudeCacheMode } from './claude-cache-mode.tsx'`,
   },
   {
     file: 'client/ProviderEditor.tsx',
@@ -515,10 +584,26 @@ import { ClaudeEmptySignature } from './claude-empty-signature.tsx'`,
   },
   {
     file: 'client/ProviderEditor.tsx',
-    label: 'Claude editor empty signature switch',
+    label: 'Claude editor cache lifetime',
     before: '                />\n              )}\n          </div>\n        </details>}',
     after: `                />
               )}
+            {props.thinkingPresets === true
+              ? (
+                <ClaudeCacheMode
+                  value={schema.getPath(draft, ['cacheRetention']) as 'none' | 'short' | 'long' | undefined}
+                  disabled={disabled}
+                  t={t}
+                  onChange={(choice) => {
+                    // An absent field is the "provider default" choice: removing
+                    // it is what lets the adapter decide for this route.
+                    setDraft(current => choice === undefined
+                      ? schema.deletePath(current, ['cacheRetention'])
+                      : schema.setPath(current, ['cacheRetention'], choice))
+                  }}
+                />
+              )
+              : null}
             {props.thinkingPresets === true
               ? (
                 <ClaudeEmptySignature

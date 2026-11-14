@@ -55,6 +55,7 @@ const ADDED_SOURCES = [
   ['claude-models.ts', 'client/claude-models.ts'],
   ['claude-adaptive-thinking.tsx', 'client/claude-adaptive-thinking.tsx'],
   ['claude-empty-signature.tsx', 'client/claude-empty-signature.tsx'],
+  ['claude-cache-mode.tsx', 'client/claude-cache-mode.tsx'],
   ['../src/known-models.ts', 'client/known-models.ts'],
 ] as const
 
