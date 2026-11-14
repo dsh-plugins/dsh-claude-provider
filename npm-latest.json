@@ -1,0 +1,10 @@
+{
+  "name": "@dsh-plugin/dsh-claude-provider",
+  "latest": "0.6.99",
+  "publishedAt": "2026-11-13T18:21:14.220Z",
+  "dist": {
+    "tarball": "https://registry.npmjs.org/@dsh-plugin/dsh-claude-provider/-/dsh-claude-provider-0.6.99.tgz",
+    "integrity": "sha512-LFTLSKhakYd1QkIi0NISjHMbdQStbJbKuqwVurdyFu/wKpU+89LxcT/PFitaizT+7IU3VV1dz2dIeTSa1PpfTw==",
+    "unpackedSize": 446104
+  }
+}
