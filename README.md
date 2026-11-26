@@ -103,27 +103,7 @@ Uninstalling the plugin does not delete official model settings or stored creden
 
 ## Settings migration
 
-This plugin stores its Claude provider type markers in its own profile patch entry, so a DSH upgrade that migrates `settings.yaml` can leave them behind. `src/migrate-legacy-types.ts` recovers only those markers, and only for providers whose profile still declares `anthropic-messages`.
-
-### 1. The new DSH version is not installed yet
-
-Stop DSH, update DSH and the Claude plugin, then start DSH. On its first launch, the new DSH version attempts to migrate the old `settings.yaml` into the current Profile.
-
-### 2. The new DSH version is installed but has not been run
-
-Migration has not started yet. Update the Claude plugin and any other plugins requiring compatibility updates before starting DSH. DSH attempts to migrate the old Settings configuration on its first launch.
-
-### 3. The new DSH version has already been run
-
-DSH has already attempted automatic Settings migration, and some settings may have migration issues.
-
-Run the recovery once against the affected profile, which writes the missing markers back and leaves a timestamped backup beside the patch file:
-
-```sh
-npx @deepseek-ai/dsh-plugin/dsh-claude-provider/migrate-legacy-types
-```
-
-For this plugin, the possible impact is limited to missing Claude provider type markers. **Model configuration and operation are unaffected by the missing markers.**
+[配置路径与自动迁移](./README.zh-CN.md#配置迁移)
 
 ## License
 

@@ -5,25 +5,25 @@ import {
   providerForUrl,
   retimeCacheTtl,
 } from './cache.ts'
-import type { MixedTtlPlan } from './cache.ts'
-import { cachePlanOf, createCacheTemplate, describePlan } from './cache-config.ts'
-import type { CacheConfig } from './cache-config.ts'
+import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
+import { cachePlanOf } from './cache-config.ts'
+import { CLAUDE_PROVIDER_SETTINGS_NS, CLAUDE_PROVIDER_TYPE } from './config.ts'
+import type { PluginConfig, ProviderTypes } from './config.ts'
 import { CLAUDE_KNOWN_MODELS } from './known-models.ts'
 import type { ClaudeKnownModel } from './known-models.ts'
+import { openProfileConfig } from './profile-config.ts'
+import type { ProfilePaths } from './profile-config.ts'
+import { installSettingsConfig } from './settings-config.ts'
 
-export { CLAUDE_KNOWN_MODELS }
+export { CLAUDE_KNOWN_MODELS, CLAUDE_PROVIDER_SETTINGS_NS, CLAUDE_PROVIDER_TYPE }
 export type { ClaudeKnownModel }
 
 export const name = 'claude-provider'
-export const inject = ['llm', 'settings']
+export const inject = ['llm', 'settings', 'profileContext']
 
-export const CLAUDE_PROVIDER_TYPE = 'claude-adaptive'
-export const CLAUDE_PROVIDER_SETTINGS_NS = 'dsh-claude-provider'
-
-/** Plugin configuration written into the profile patch entry. */
+/** 允许宿主加载仍含旧类型标记的 profile 补丁。 */
 export const Config = z.object({
-  /** Provider ids the settings page marked as this plugin's Claude type. */
-  providerTypes: z.dict(z.const(CLAUDE_PROVIDER_TYPE)).default({}).volatile(),
+  providerTypes: z.dict(z.const(CLAUDE_PROVIDER_TYPE)).default({}),
 })
 
 export type Config = ReturnType<typeof Config>
@@ -89,8 +89,11 @@ export interface LlmFace {
  */
 export interface PluginContext {
   readonly llm: LlmFace
-  get(name: 'settings'): SettingsFace | undefined
+  readonly profileContext: ProfilePaths
+  readonly root: { loader: { await(): Promise<void> } }
+  get(name: 'settings'): SettingsFace
   get(name: 'credentials'): CredentialsFace | undefined
+  emit(event: 'settings/document-updated', ns: SettingsNamespace, revision: number): void
   effect(factory: () => () => void): unknown
   /**
    * Mount a sub-context once the named services exist; a service the profile
@@ -352,25 +355,11 @@ function installClaudeModelDiscovery(ctx: PluginContext): void {
   })
 }
 
-/** Configuration and patch faces the cache control uses when loader provides them. */
+/** 分段缓存使用的 dsh-loader 补丁接口。 */
 interface CacheLoaderFace {
-  config: {
-    register<T>(owner: unknown, template: unknown): Promise<{
-      get(): { value: T, revision: number }
-      watch(listener: (snapshot: { value: T, revision: number }) => void): () => void
-      registerOperation(id: string, handler: (request: unknown) => Promise<unknown> | unknown): () => void
-      dispose(): void
-    }>
-  }
   patch: {
     global<T>(key: PropertyKey, wrap: (original: T) => T, options?: { id?: string, owner?: unknown }): { dispose(): void }
   }
-}
-
-/** Live provider facts one request is matched against. */
-interface CacheTargets {
-  /** Provider id to configured base URL, for Claude routes asking for an hour. */
-  bases: Map<string, string>
 }
 
 function settingsValue(ctx: PluginContext, ns: string): Record<string, unknown> | undefined {
@@ -378,35 +367,24 @@ function settingsValue(ctx: PluginContext, ns: string): Record<string, unknown> 
   return typeof entry === 'object' && entry !== null ? entry as Record<string, unknown> : undefined
 }
 
-/**
- * Collect the Claude routes that asked for a one-hour cache lifetime.
- *
- * The condition is the route's own `cacheRetention`: a route left on the
- * provider default, or on five minutes, keeps whatever the adapter decided. A
- * one-hour route is the only one whose breakpoints can be split, because a
- * five-minute route has nothing longer to put in front of its short entries.
- *
- * Both facts are read from live settings on every request: a route added while
- * the process runs must be intercepted without a restart, and a route dropped
- * back to the default must stop being rewritten immediately.
- * @param ctx - plugin context.
- * @returns the eligible routes and their base URLs.
- */
-function cacheTargets(ctx: PluginContext): CacheTargets {
+function cacheTargets(ctx: PluginContext, markers: ProviderTypes): Map<string, string> {
   const bases = new Map<string, string>()
-  const markers = settingsValue(ctx, CLAUDE_PROVIDER_SETTINGS_NS)?.['providerTypes']
   const profiles = settingsValue(ctx, PI_AI_SETTINGS_NS)?.['providers']
-  if (markers === null || typeof markers !== 'object') return { bases }
-  if (profiles === null || typeof profiles !== 'object') return { bases }
-  const directory = profiles as Record<string, { cacheRetention?: unknown, baseURL?: unknown } | undefined>
-  for (const [provider, marker] of Object.entries(markers as Record<string, unknown>)) {
-    if (marker !== CLAUDE_PROVIDER_TYPE) continue
-    const profile = directory[provider]
-    if (profile?.cacheRetention !== 'long') continue
-    const baseURL = profile.baseURL
-    if (typeof baseURL === 'string' && baseURL.trim().length > 0) bases.set(provider, baseURL)
+  if (profiles === null || typeof profiles !== 'object') {
+    return bases
   }
-  return { bases }
+  const directory = profiles as Record<string, { cacheRetention?: unknown, baseURL?: unknown } | undefined>
+  for (const provider of Object.keys(markers)) {
+    const profile = directory[provider]
+    if (profile?.cacheRetention !== 'long') {
+      continue
+    }
+    const baseURL = profile.baseURL
+    if (typeof baseURL === 'string' && baseURL.trim().length > 0) {
+      bases.set(provider, baseURL)
+    }
+  }
+  return bases
 }
 
 function requestUrlOf(input: RequestInfo | URL): string | undefined {
@@ -428,56 +406,14 @@ function headersOf(input: RequestInfo | URL, init: RequestInit | undefined): Hea
   return headers
 }
 
-/**
- * Install mixed-TTL rewriting and cache pre-warming.
- *
- * Both halves need the loader's patch and configuration faces, so they mount
- * only when a loader is present: a profile without one keeps the plugin's
- * catalog and model behavior and sends unmodified requests.
- * @param ctx - plugin context.
- */
-function installCacheControl(ctx: PluginContext): void {
+function installCacheControl(ctx: PluginContext, currentConfig: () => PluginConfig | undefined): void {
   ctx.inject(['dshLoader'], (sub: PluginContext & { dshLoader: CacheLoaderFace }) => {
     const loader = sub.dshLoader
-    // The plan is read per request so a settings save applies to the next call
-    // without a reload. `undefined` means no rewriting: the switch is off, or
-    // the assignment describes an order the API refuses.
-    let plan: MixedTtlPlan | undefined
-    const original = globalThis.fetch
-    if (typeof original !== 'function') {
+    if (typeof globalThis.fetch !== 'function') {
       sub.logger?.warn('[claude-provider] 全局 fetch 不可用；混合缓存失效')
       return
     }
-    sub.effect(() => {
-      let disposed = false
-      void loader.config.register<CacheConfig>(sub, createCacheTemplate()).then((handle) => {
-        const sync = (snapshot: { value: CacheConfig }): void => {
-          if (!snapshot.value.mixedEnabled) {
-            plan = undefined
-            return
-          }
-          const next = cachePlanOf(snapshot.value)
-          const failure = mixedPlanFailure(next)
-          if (failure !== undefined) {
-            plan = undefined
-            sub.logger?.warn(`[claude-provider] 分段缓存时长不可用：${failure}；相关请求沿用提供商时长`)
-            return
-          }
-          plan = next
-        }
-        sync(handle.get())
-        handle.watch(snapshot => { sync(snapshot) })
-        handle.registerOperation('plan', (request: unknown) => {
-          const value = (request as { config?: { value?: CacheConfig } } | undefined)?.config?.value
-          return { value: value === undefined ? '尚未读取到配置。' : describePlan(value) }
-        })
-        if (disposed) handle.dispose()
-      }).catch((error: unknown) => {
-        sub.logger?.warn('[claude-provider] 缓存配置注册失败；分段缓存不可用', error)
-      })
-      return () => { disposed = true }
-    })
-    const handle = loader.patch.global<typeof fetch>('fetch', upstream => async function (this: unknown, input, init) {
+    loader.patch.global<typeof fetch>('fetch', upstream => async function (this: unknown, input, init) {
       // The cheapest test first: this wrapper sits on every fetch call in the
       // process, so a method and URL check must not build Headers or read
       // settings for requests that cannot be Anthropic Messages calls.
@@ -488,7 +424,15 @@ function installCacheControl(ctx: PluginContext): void {
       if (!isMessagesRequest(url, methodOf(input, init), headers)) {
         return upstream.call(this, input, init)
       }
-      const provider = providerForUrl(url, cacheTargets(sub).bases)
+      const config = currentConfig()
+      if (!config?.mixedEnabled) {
+        return upstream.call(this, input, init)
+      }
+      const plan = cachePlanOf(config)
+      if (mixedPlanFailure(plan) !== undefined) {
+        return upstream.call(this, input, init)
+      }
+      const provider = providerForUrl(url, cacheTargets(sub, config.providerTypes))
       if (provider === undefined) return upstream.call(this, input, init)
       const text = typeof init?.body === 'string' ? init.body : undefined
       if (text === undefined) return upstream.call(this, input, init)
@@ -499,7 +443,6 @@ function installCacheControl(ctx: PluginContext): void {
         sub.logger?.warn(`[claude-provider] ${provider} 的请求体不是 JSON，跳过缓存改写`, error)
         return upstream.call(this, input, init)
       }
-      if (plan === undefined) return upstream.call(this, input, init)
       const { body, changed } = retimeCacheTtl(parsed, plan)
       if (!changed) return upstream.call(this, input, init)
       return upstream.call(this, input, { ...init, body: JSON.stringify(body) })
@@ -509,5 +452,23 @@ function installCacheControl(ctx: PluginContext): void {
 
 export function apply(ctx: PluginContext): void {
   installClaudeModelDiscovery(ctx)
-  installCacheControl(ctx)
+  const lifecycle = new AbortController()
+  ctx.effect(() => () => lifecycle.abort())
+  // 宿主重载配置时可能持有 profile 锁，迁移要等宿主完成插件加载。
+  const config = openProfileConfig(ctx.profileContext, {
+    providers: () => settingsValue(ctx, PI_AI_SETTINGS_NS)?.['providers'],
+    signal: lifecycle.signal,
+    warn: (message, error) => ctx.logger?.warn(message, error),
+  }, ctx.root.loader.await())
+  installSettingsConfig(ctx, ctx.get('settings'), config)
+  installCacheControl(ctx, () => config.get()?.value)
+  void config.ready.then(({ revision }) => {
+    if (!lifecycle.signal.aborted) {
+      ctx.emit('settings/document-updated', CLAUDE_PROVIDER_SETTINGS_NS as SettingsNamespace, revision)
+    }
+  }).catch((error: unknown) => {
+    if (!lifecycle.signal.aborted) {
+      ctx.logger?.warn('[claude-provider] 加载或迁移 profile 配置失败', error)
+    }
+  })
 }

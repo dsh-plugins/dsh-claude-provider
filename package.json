@@ -27,8 +27,9 @@
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "dependencies": {
+    "@deepseek-ai/dsh-atomic-write": "0.2.2-rc.3",
     "@deepseek-ai/schemastery": "3.19.0",
-    "js-yaml": "^4.3.2"
+    "yaml": "^2.9.1"
   },
   "exports": {
     ".": {
@@ -98,7 +99,6 @@
     "@deepseek-ai/dsh-llm": "0.2.2-rc.3",
     "@deepseek-ai/dsh-settings": "0.2.2-rc.3",
     "@deepseek-ai/dsh-util-values": "0.2.2-rc.3",
-    "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.13.3",
     "@types/react": "18.3.27",
     "esbuild": "^0.28.2",

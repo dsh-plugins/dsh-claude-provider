@@ -6,7 +6,7 @@ import {
   providerForUrl,
   retimeCacheTtl,
 } from '../src/cache.ts'
-import { cachePlanOf, cacheTtlOf, createCacheTemplate, describePlan } from '../src/cache-config.ts'
+import { cachePlanOf, cacheTtlOf, describePlan } from '../src/cache-config.ts'
 
 /** A breakpoint the adapter would stamp on a cacheable block. */
 const SHORT = { type: 'ephemeral' }
@@ -149,22 +149,4 @@ test('配置默认值与当前生效方案可读', () => {
 
   const off = { ...defaults, mixedEnabled: false }
   assert.match(describePlan(off), /已关闭/)
-})
-
-test('模板通过 loader 的真实校验', async (t) => {
-  // dsh-loader is an optional peer: a checkout without it (CI, or a user who
-  // never installed the loader) still runs every other test. When it is present,
-  // the template is checked against the real contract instead of the shape this
-  // package declares locally.
-  let validateTemplate: ((template: unknown) => void) | undefined
-  try {
-    ({ validateTemplate } = await import('../../dsh-loader/dist/config.js'))
-  } catch {
-    validateTemplate = undefined
-  }
-  if (validateTemplate === undefined) {
-    t.skip('同级目录没有构建好的 dsh-loader')
-    return
-  }
-  validateTemplate(createCacheTemplate())
 })

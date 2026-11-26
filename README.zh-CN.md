@@ -105,27 +105,11 @@ npx @deepseek-ai/dsh plugin --profile web remove @dsh-plugin/dsh-claude-provider
 
 ## 配置迁移
 
-插件把 Claude 提供方类型标记保存在自己的 Profile 补丁条目里，因此 DSH 迁移 `settings.yaml` 时可能不会带上这些标记。`src/migrate-legacy-types.ts` 只恢复这些标记，并且仅针对配置中仍声明 `anthropic-messages` 的提供方。
+Claude 提供方类型标记和分段缓存选项统一保存在 `<DSH_HOME>/profiles/<profile>/config/dsh-claude-provider/config.json`。
 
-### 1. 尚未安装新版 DSH
+升级后首次启动时，插件会自动导入当前 profile 的 `cordis.patch.yml` 中的 `providerTypes`，以及 `config/claude-cache/config.json` 中的分段缓存选项。目标 JSON 保存成功后，插件会从补丁中移除旧标记并删除旧缓存配置文件。目标 JSON 已有的设置优先。
 
-先关闭 DSH，升级 DSH 和 Claude 插件，再启动 DSH。新版 DSH 首次启动时，会尝试将旧 `settings.yaml` 迁移到当前 Profile。
-
-### 2. 已安装新版 DSH，但尚未运行
-
-此时尚未触发配置迁移。先更新 Claude 插件及其他需要适配的插件，再启动 DSH。新版 DSH 首次启动时，会尝试迁移旧 Settings 配置。
-
-### 3. 已安装并运行过新版 DSH
-
-此时 Settings 已经由 DSH 执行过自动迁移，部分配置可能存在迁移问题。
-
-对受影响的 Profile 执行一次补救，缺失的标记会写回，并在补丁文件旁留下带时间戳的备份：
-
-```sh
-npx @dsh-plugin/dsh-claude-provider/migrate-legacy-types
-```
-
-对本插件而言，可能的影响只有 Claude 提供方类型标记丢失，**模型配置和运行不受影响**。
+从更早的 DSH 版本升级时，插件还会从 `settings.yaml` 或 DSH 生成的 `settings.yaml.imported` 恢复与当前 profile 中 `anthropic-messages` 路由匹配的 Claude 类型标记。
 
 ## 许可证
 

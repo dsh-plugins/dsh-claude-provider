@@ -208,6 +208,21 @@ export const PATCHES: readonly Patch[] = [
     after: `${terminator}\n${claudeCopyLines(locale)}`,
   })),
 
+  {
+    file: 'client/index.ts',
+    label: 'Claude cache settings import',
+    before: "import { ModelsSection } from './ModelsSection.tsx'",
+    after: `import { ModelsSection } from './ModelsSection.tsx'
+import { registerClaudeCacheSettings } from './claude-cache-settings.tsx'`,
+  },
+  {
+    file: 'client/index.ts',
+    label: 'Claude cache settings registration',
+    before: '  const controller = new ModelsSettingsStore(ctx, schema, ctx.configForms.describe())',
+    after: `  const controller = new ModelsSettingsStore(ctx, schema, ctx.configForms.describe())
+  registerClaudeCacheSettings(ctx)`,
+  },
+
   // ---- store: name the marker namespace once ----
   {
     file: 'client/store.ts',
