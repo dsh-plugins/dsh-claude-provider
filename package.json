@@ -45,6 +45,7 @@
     "./package.json": "./package.json"
   },
   "files": [
+    "dsh_pack/",
     "lib/**/*.js",
     "lib/**/*.d.ts",
     "src/**/*.ts",

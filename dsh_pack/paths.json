@@ -1,0 +1,15 @@
+[
+  {
+    "name": {
+      "zh-CN": "Claude 提供商设置",
+      "en": "Claude provider settings"
+    },
+    "desc": {
+      "zh-CN": "包含 Claude 提供商类型标记及提示缓存时长。",
+      "en": "Includes Claude provider type markers and prompt cache durations."
+    },
+    "paths": [
+      "./profiles/<profile>/config/dsh-claude-provider/config.json"
+    ]
+  }
+]
