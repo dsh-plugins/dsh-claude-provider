@@ -19,7 +19,7 @@ export { CLAUDE_KNOWN_MODELS, CLAUDE_PROVIDER_SETTINGS_NS, CLAUDE_PROVIDER_TYPE 
 export type { ClaudeKnownModel }
 
 export const name = 'claude-provider'
-export const inject = ['llm', 'settings', 'profileContext']
+export const inject = ['llm', 'settings', 'profileContext', 'loader']
 
 /** 允许宿主加载仍含旧类型标记的 profile 补丁。 */
 export const Config = z.object({
@@ -90,7 +90,7 @@ export interface LlmFace {
 export interface PluginContext {
   readonly llm: LlmFace
   readonly profileContext: ProfilePaths
-  readonly root: { loader: { await(): Promise<void> } }
+  readonly loader: { await(): Promise<void> }
   get(name: 'settings'): SettingsFace
   get(name: 'credentials'): CredentialsFace | undefined
   emit(event: 'settings/document-updated', ns: SettingsNamespace, revision: number): void
@@ -459,7 +459,7 @@ export function apply(ctx: PluginContext): void {
     providers: () => settingsValue(ctx, PI_AI_SETTINGS_NS)?.['providers'],
     signal: lifecycle.signal,
     warn: (message, error) => ctx.logger?.warn(message, error),
-  }, ctx.root.loader.await())
+  }, ctx.loader.await())
   installSettingsConfig(ctx, ctx.get('settings'), config)
   installCacheControl(ctx, () => config.get()?.value)
   void config.ready.then(({ revision }) => {
